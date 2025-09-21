@@ -713,6 +713,39 @@
       color: #2563eb;
     }
     
+    /* Mobile tabs */
+    .mobile-tabs {
+      display: flex;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    
+    .mobile-tab {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: var(--transition);
+      border-bottom: 3px solid transparent;
+    }
+    
+    .mobile-tab.active {
+      border-bottom: 3px solid var(--accent);
+      background: rgba(14, 165, 233, 0.1);
+    }
+    
+    .mobile-tab-content {
+      display: none;
+    }
+    
+    .mobile-tab-content.active {
+      display: block;
+    }
+    
     @media (min-width: 768px) {
       .container {
         padding: 24px;
@@ -747,6 +780,14 @@
       
       .summary-value {
         font-size: 24px;
+      }
+      
+      .mobile-tabs {
+        display: none;
+      }
+      
+      .mobile-tab-content {
+        display: block;
       }
     }
   </style>
@@ -784,11 +825,18 @@
       </div>
     </div>
 
+    <!-- Mobile Tabs -->
+    <div class="mobile-tabs">
+      <div class="mobile-tab active" data-tab="transactions">Transactions</div>
+      <div class="mobile-tab" data-tab="accounts">Accounts</div>
+      <div class="mobile-tab" data-tab="categories">Categories</div>
+    </div>
+
     <main class="grid">
       <!-- Left -->
       <div class="col">
         <!-- Add transaction -->
-        <div class="card" id="txFormCard">
+        <div class="card mobile-tab-content active" id="txFormCard" data-tab="transactions">
           <div class="sectionTitle">
             <h2><i class="fas fa-plus-circle"></i> Add Transaction</h2>
           </div>
@@ -861,7 +909,7 @@
         </div>
 
         <!-- Filters -->
-        <div class="card" id="filterCard">
+        <div class="card mobile-tab-content active" id="filterCard" data-tab="transactions">
           <div class="sectionTitle">
             <h2><i class="fas fa-filter"></i> Filters</h2>
           </div>
@@ -902,7 +950,7 @@
         </div>
 
         <!-- Transactions -->
-        <div class="card" id="txListCard">
+        <div class="card mobile-tab-content active" id="txListCard" data-tab="transactions">
           <div class="sectionTitle">
             <h2><i class="fas fa-list"></i> Transactions</h2>
           </div>
@@ -914,14 +962,14 @@
 
       <!-- Right -->
       <div class="col">
-        <div class="card" id="initBalancesCard">
+        <div class="card mobile-tab-content" id="initBalancesCard" data-tab="accounts">
           <div class="sectionTitle">
             <h2><i class="fas fa-piggy-bank"></i> Initial Balances</h2>
           </div>
           <div id="initialBalancesArea"></div>
         </div>
 
-        <div class="card" id="accountsCard">
+        <div class="card mobile-tab-content" id="accountsCard" data-tab="accounts">
           <div class="sectionTitle">
             <h2><i class="fas fa-university"></i> Accounts</h2>
           </div>
@@ -931,7 +979,7 @@
           <div id="accountsArea"></div>
         </div>
 
-        <div class="card" id="categoriesCard">
+        <div class="card mobile-tab-content" id="categoriesCard" data-tab="categories">
           <div class="sectionTitle">
             <h2><i class="fas fa-tags"></i> Categories</h2>
           </div>
@@ -2341,6 +2389,25 @@
         saveData(); renderAccounts(); renderTransactions(); renderCategories();
       }
     };
+
+    /* ====== Mobile Tabs ====== */
+    document.querySelectorAll('.mobile-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        const tabName = this.getAttribute('data-tab');
+        
+        // Update active tab
+        document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Show/hide content
+        document.querySelectorAll('.mobile-tab-content').forEach(content => {
+          content.classList.remove('active');
+          if (content.getAttribute('data-tab') === tabName) {
+            content.classList.add('active');
+          }
+        });
+      });
+    });
 
     /* ====== Expand/Collapse & small toggles ====== */
     // Add click handlers for section titles to toggle content
