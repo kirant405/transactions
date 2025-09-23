@@ -1,0 +1,122 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0.5rem;
+  background: #f9fafb;
+  color: #1f2937;
+}
+
+#summaryBar {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+}
+
+#summaryBar > div {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: #e5e7eb;
+  cursor: pointer;
+  text-align: center;
+}
+
+#summaryBar > div.active {
+  border: 2px solid #2563eb;
+}
+
+#filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+form, #categoriesArea, #accountsArea, #transactionsList {
+  margin-bottom: 1rem;
+}
+
+input, select, button {
+  padding: 0.4rem;
+  border-radius: 5px;
+  border: 1px solid #cbd5e1;
+}
+
+button {
+  cursor: pointer;
+}
+
+.hidden { display: none; }
+
+#transactionsListHeader, #transactionsList {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: white;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.item.show { animation: fadeIn 0.3s ease forwards; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.txAmount.income { color: #047857; }
+.txAmount.expense { color: #dc2626; }
+
+.recurring-badge {
+  background: #fbbf24;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  margin-left: 5px;
+  font-size: 0.75rem;
+}
+
+.recurring-stopped {
+  background: #9ca3af;
+}
+
+.subcategory-list {
+  margin-left: 1rem;
+  display: none;
+}
+
+.subcategory-list.expanded { display: block; }
+
+#editPanelOverlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  display: none;
+}
+
+#editPanelOverlay.show { display: flex; }
+
+#editPanel {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+}
+
+#editPanel.show { animation: slideDown 0.3s ease forwards; }
+
+@keyframes slideDown {
+  from { transform: translateY(-50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
