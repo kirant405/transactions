@@ -24,4 +24,4 @@ A web-based personal finance tracker to manage accounts, transactions, categorie
 1. Clone or download the repository:
 
 ```bash
-git clone <your-repo-url>
+git clone <https://github.com/kirant405/transactions/blob/main/Transactions.html>
