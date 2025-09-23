@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Transactions Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <!-- Header / Summary Bar -->
+  <div id="summaryBar">
+    <div id="summaryIncomeBox"><span id="summaryIncome">₹0</span> Income</div>
+    <div id="summaryExpenseBox"><span id="summaryExpense">₹0</span> Expense</div>
+    <div id="summaryNetBox"><span id="summaryNet">₹0</span> Net</div>
+  </div>
+
+  <!-- Filters -->
+  <div id="filters">
+    <select id="filterType">
+      <option value="all">All Types</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+      <option value="transfer">Transfer</option>
+    </select>
+    <select id="filterMode">
+      <option value="all">All Modes</option>
+      <option value="cash">Cash</option>
+      <option value="card">Card</option>
+      <option value="upi">UPI</option>
+    </select>
+    <select id="filterAccount"></select>
+    <select id="filterCategory"></select>
+    <select id="filterSubCategory"></select>
+    <input type="text" id="filterSearch" placeholder="Search description...">
+    <button id="resetFilters">Reset Filters</button>
+  </div>
+
+  <!-- Add Transaction Form -->
+  <form id="txForm">
+    <input type="date" id="txDate">
+    <input type="number" id="txAmount" placeholder="Amount">
+    <input type="text" id="txDesc" placeholder="Description">
+    <select id="txType">
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+      <option value="transfer">Transfer</option>
+    </select>
+    <select id="txMode">
+      <option value="cash">Cash</option>
+      <option value="card">Card</option>
+      <option value="upi">UPI</option>
+    </select>
+    <select id="txFrom"></select>
+    <div id="toAccountContainer">
+      <select id="txTo"></select>
+    </div>
+    <select id="txCategory"></select>
+    <select id="txSubCategory"></select>
+    <input type="number" id="cbValue" placeholder="Cashback">
+    <select id="cbType">
+      <option value="amount">Amount</option>
+      <option value="percent">%</option>
+    </select>
+    <select id="recurringType">
+      <option value="none">None</option>
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+    <div id="recurringOptions" class="hidden">
+      <input type="date" id="endDate">
+      <input type="number" id="maxOccurrences" placeholder="Max Occurrences">
+    </div>
+    <button type="submit">Add Transaction</button>
+    <button type="button" id="clearTx">Clear</button>
+  </form>
+
+  <!-- Transaction Summary -->
+  <div id="txListSummary"></div>
+
+  <!-- Transaction List -->
+  <div id="transactionsListHeader"></div>
+  <div id="transactionsList"></div>
+
+  <!-- Categories -->
+  <div id="categoriesArea"></div>
+  <button id="addCategoryBtn">Add Category</button>
+
+  <!-- Accounts -->
+  <div id="accountsArea"></div>
+  <button id="addAccountBtn">Add Account</button>
+
+  <!-- Edit Panel Overlay -->
+  <div id="editPanelOverlay">
+    <div id="editPanel">
+      <form id="editTxForm">
+        <input type="date" id="editDate">
+        <input type="text" id="editDesc" placeholder="Description">
+        <input type="number" id="editAmount" placeholder="Amount">
+        <select id="editMode">
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="upi">UPI</option>
+        </select>
+        <select id="editCategory"></select>
+        <select id="editSubCategory"></select>
+        <select id="editRecurringType">
+          <option value="none">None</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <div id="editRecurringOptions" class="hidden">
+          <input type="date" id="editEndDate">
+          <input type="number" id="editMaxOccurrences" placeholder="Max Occurrences">
+        </div>
+        <button type="submit">Save</button>
+        <button type="button" id="stopRecurringBtn">Stop Recurring</button>
+        <button type="button" id="deleteTxBtn">Delete</button>
+        <button type="button" id="closeEditBtn">Close</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Export / Import / Reset -->
+  <button id="exportJson">Export JSON</button>
+  <button id="importJsonBtn">Import JSON</button>
+  <input type="file" id="importFile" style="display:none;">
+  <button id="resetAppBtn">Reset App</button>
+
+  <script src="script.js"></script>
+</body>
+</html>
