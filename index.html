@@ -5,6 +5,7 @@
   <title>Daily Transactions — Single File App (₹)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Short+Stack&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -40,10 +41,9 @@
       </div>
     </div>
 
-    <!-- Mobile Tabs -->
+    <!-- Mobile Tabs (without Add tab) -->
     <div class="mobile-tabs">
-      <div class="mobile-tab active" data-tab="add">Add</div>
-      <div class="mobile-tab" data-tab="transactions">Transactions</div>
+      <div class="mobile-tab active" data-tab="transactions">Transactions</div>
       <div class="mobile-tab" data-tab="accounts">Accounts</div>
       <div class="mobile-tab" data-tab="categories">Categories</div>
     </div>
@@ -51,7 +51,7 @@
     <main class="grid">
       <!-- Left -->
       <div class="col">
-        <!-- Add transaction -->
+        <!-- Add transaction (hidden on mobile) -->
         <div class="card mobile-tab-content active" id="txFormCard" data-tab="add">
           <div class="sectionTitle">
             <h2><i class="fas fa-plus-circle"></i> Add Transaction</h2>
@@ -171,12 +171,8 @@
 
         <!-- Transactions -->
         <div class="card mobile-tab-content" id="txListCard" data-tab="transactions">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-list"></i> Transactions</h2>
-          </div>
           <div class="collapsible-content" id="txListContent">
             <div id="txListSummary"></div>
-            <div id="transactionsListHeader"></div>
             <div id="transactionsList"></div>
           </div>
         </div>
@@ -224,6 +220,84 @@
     </footer>
   </div>
 
+  <!-- Floating Add Button (Mobile Only) -->
+  <button class="floating-add-btn" id="floatingAddBtn">
+    <i class="fas fa-plus"></i>
+  </button>
+
+  <!-- Mobile Add Transaction Panel -->
+  <div id="mobileAddPanel">
+    <div id="mobileAddPanelHeader">
+      <h3><i class="fas fa-plus-circle"></i> Add Transaction</h3>
+      <button id="closeMobileAddPanel">&times;</button>
+    </div>
+    <form id="mobileTxForm">
+      <div class="row">
+        <select id="mobileTxType">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+          <option value="transfer">Transfer</option>
+        </select>
+        <select id="mobileTxMode">
+          <option value="UPI">UPI</option>
+          <option value="Debit Card">Debit Card</option>
+          <option value="Credit Card">Credit Card</option>
+          <option value="Cash">Cash</option>
+          <option value="Netbanking">Netbanking</option>
+          <option value="Wallet">Wallet</option>
+        </select>
+      </div>
+      <input type="date" id="mobileTxDate" style="margin-bottom: 12px;" />
+      <div id="mobileFromToWrap">
+        <label>From Account</label>
+        <select id="mobileTxFrom"></select>
+        <div id="mobileToAccountContainer" style="display:none;">
+          <label style="margin-top:12px">To Account</label>
+          <select id="mobileTxTo"></select>
+        </div>
+      </div>
+      <label style="margin-top:12px">Amount (₹)</label>
+      <input type="number" id="mobileTxAmount" min="0" step="0.01" required placeholder="Enter amount" />
+      <label style="margin-top:12px">Description (optional)</label>
+      <input type="text" id="mobileTxDesc" placeholder="Enter description" />
+      <label style="margin-top:12px">Category</label>
+      <select id="mobileTxCategory">
+        <option value="">Select Category</option>
+      </select>
+      <label style="margin-top:12px">Sub Category (optional)</label>
+      <select id="mobileTxSubCategory">
+        <option value="">Select Sub Category</option>
+      </select>
+      <div class="row" style="margin-top:12px">
+        <select id="mobileCbType">
+          <option value="amount">Cashback ₹</option>
+          <option value="percentage">Cashback %</option>
+        </select>
+        <input type="number" id="mobileCbValue" placeholder="0" min="0" step="0.01" />
+      </div>
+      <div class="row" style="margin-top:12px">
+        <select id="mobileRecurringType">
+          <option value="none">One-time</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="half-yearly">Half-Yearly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      <div id="mobileRecurringOptions" class="mobile-recurring-options hidden">
+        <div class="row">
+          <input type="date" id="mobileEndDate" placeholder="End date (optional)" />
+          <input type="number" id="mobileMaxOccurrences" placeholder="Max occurrences (optional)" min="1" />
+        </div>
+      </div>
+      <div style="margin-top:20px">
+        <button type="submit" style="width:100%;padding:12px;font-size:16px;"><i class="fas fa-plus"></i> Add Transaction</button>
+      </div>
+    </form>
+  </div>
+
   <!-- Edit Panel -->
   <div id="editPanelOverlay">
     <div id="editPanel">
@@ -244,6 +318,20 @@
           <option value="Netbanking">Netbanking</option>
           <option value="Wallet">Wallet</option>
         </select>
+        <label><i class="fas fa-exchange-alt"></i> Transaction Type</label>
+        <select id="editType">
+          <option value="expense">Expense</option>
+          <option value="income">Income</option>
+          <option value="transfer">Transfer</option>
+        </select>
+        <div id="editFromToWrap">
+          <label><i class="fas fa-arrow-circle-right"></i> From Account</label>
+          <select id="editFrom"></select>
+          <div id="editToAccountContainer" style="display:none;">
+            <label style="margin-top:12px"><i class="fas fa-arrow-circle-left"></i> To Account</label>
+            <select id="editTo"></select>
+          </div>
+        </div>
         <label><i class="fas fa-tags"></i> Category</label>
         <select id="editCategory">
           <option value="">Select Category</option>
