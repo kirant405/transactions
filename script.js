@@ -208,6 +208,8 @@ const filterSubCategory = document.getElementById('filterSubCategory');
 const filterSearch = document.getElementById('filterSearch');
 
 const importFile = document.getElementById('importFile');
+const importJsonBtn = document.getElementById('importJsonBtn');
+const exportJsonBtn = document.getElementById('exportJson');
 
 // Edit panel elements
 const editType = document.getElementById('editType');
@@ -1631,33 +1633,49 @@ document.getElementById('addCategoryBtn').onclick = ()=>{
 };
 
 /* ====== Export / Import / Reset ====== */
-document.getElementById('exportJson').onclick = ()=>{
-  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+exportJsonBtn.addEventListener('click', function() {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'daily-transactions.json'; a.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'daily-transactions.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
-};
-document.getElementById('importJsonBtn').onclick = ()=> importFile.click();
-importFile.onchange = (e)=>{
+});
+
+importJsonBtn.addEventListener('click', function() {
+  importFile.click();
+});
+
+importFile.addEventListener('change', function(e) {
   const file = e.target.files[0];
-  if(!file) return;
+  if (!file) return;
+  
   const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const parsed = JSON.parse(reader.result);
-      if(parsed.accounts && parsed.transactions){
+  reader.onload = function(event) {
+    try {
+      const parsed = JSON.parse(event.target.result);
+      if (parsed.accounts && parsed.transactions) {
         data = parsed;
         saveData();
-        renderAccounts(); renderTransactions(); renderCategories();
+        renderAccounts();
+        renderTransactions();
+        renderCategories();
         alert('Data imported successfully!');
       } else {
         alert('Invalid file structure');
       }
-    } catch(err){ alert('Invalid JSON file'); }
+    } catch (err) {
+      alert('Invalid JSON file: ' + err.message);
+    }
+    // Reset the file input
+    importFile.value = '';
   };
   reader.readAsText(file);
-  importFile.value = '';
-};
+});
+
 document.getElementById('resetAppBtn').onclick = ()=>{
   if(confirm('Are you sure you want to reset all data? This action cannot be undone.')){
     data = { 
