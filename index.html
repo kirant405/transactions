@@ -1,369 +1,80 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Daily Transactions — Single File App (₹)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Short+Stack&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Transactions</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container" id="app">
-    <header>
-      <h1><i class="fas fa-wallet"></i> Daily Transactions</h1>
-      <div class="muted">Manage your accounts, transactions, and finances with ease</div>
-    </header>
+  <header>
+    <h1>Daily Transactions</h1>
+    <nav>
+      <button id="tabTransactions">Transactions</button>
+      <button id="tabAccounts">Accounts</button>
+    </nav>
+  </header>
 
-    <!-- Top controls -->
-    <div class="controls">
-      <button id="expandAllBtn"><i class="fas fa-expand"></i> Expand All</button>
-      <button id="collapseAllBtn" class="ghost"><i class="fas fa-compress"></i> Collapse All</button>
-      <button id="resetAppBtn" class="ghost"><i class="fas fa-trash-alt"></i> Reset Data</button>
-      <button id="exportJson" class="ghost"><i class="fas fa-download"></i> Export JSON</button>
-      <button id="importJsonBtn" class="ghost"><i class="fas fa-upload"></i> Import JSON</button>
-      <input id="importFile" type="file" accept=".json" style="display:none"/>
-    </div>
-
-    <!-- Summary Bar -->
-    <div class="card" id="summaryBar">
-      <div id="summaryIncomeBox">
-        <div class="muted text-sm"><i class="fas fa-arrow-down"></i> Total Income</div>
-        <div id="summaryIncome" class="summary-value">₹0.00</div>
-      </div>
-      <div id="summaryExpenseBox">
-        <div class="muted text-sm"><i class="fas fa-arrow-up"></i> Total Expense</div>
-        <div id="summaryExpense" class="summary-value">₹0.00</div>
-      </div>
-      <div id="summaryNetBox">
-        <div class="muted text-sm"><i class="fas fa-balance-scale"></i> Net Balance</div>
-        <div id="summaryNet" class="summary-value">₹0.00</div>
-      </div>
-    </div>
-
-    <!-- Mobile Tabs (without Add tab) -->
-    <div class="mobile-tabs">
-      <div class="mobile-tab active" data-tab="transactions">Transactions</div>
-      <div class="mobile-tab" data-tab="accounts">Accounts</div>
-      <div class="mobile-tab" data-tab="categories">Categories</div>
-    </div>
-
-    <main class="grid">
-      <!-- Left -->
-      <div class="col">
-        <!-- Add transaction (hidden on mobile) -->
-        <div class="card mobile-tab-content active" id="txFormCard" data-tab="add">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-plus-circle"></i> Add Transaction</h2>
-          </div>
-          <div class="collapsible-content" id="txFormContent">
-            <form id="txForm">
-              <div class="row">
-                <select id="txType">
-                  <option value="expense"><i class="fas fa-arrow-up"></i> Expense</option>
-                  <option value="income"><i class="fas fa-arrow-down"></i> Income</option>
-                  <option value="transfer"><i class="fas fa-exchange-alt"></i> Transfer</option>
-                </select>
-                <select id="txMode">
-                  <option value="UPI">UPI</option>
-                  <option value="Debit Card">Debit Card</option>
-                  <option value="Credit Card">Credit Card</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Netbanking">Netbanking</option>
-                  <option value="Wallet">Wallet</option>
-                </select>
-                <input type="date" id="txDate" />
-              </div>
-              <div id="fromToWrap" style="margin-top:12px">
-                <label>From Account</label>
-                <select id="txFrom"></select>
-                <div id="toAccountContainer" style="display:none;">
-                  <label style="margin-top:12px">To Account</label>
-                  <select id="txTo"></select>
-                </div>
-              </div>
-              <label style="margin-top:12px">Amount (₹)</label>
-              <input type="number" id="txAmount" min="0" step="0.01" required placeholder="Enter amount" />
-              <label style="margin-top:12px">Description (optional)</label>
-              <input type="text" id="txDesc" placeholder="Enter description" />
-              <label style="margin-top:12px">Category</label>
-              <select id="txCategory">
-                <option value="">Select Category</option>
-              </select>
-              <label style="margin-top:12px">Sub Category (optional)</label>
-              <select id="txSubCategory">
-                <option value="">Select Sub Category</option>
-              </select>
-              <div class="row" style="margin-top:12px">
-                <select id="cbType">
-                  <option value="amount">Cashback ₹</option>
-                  <option value="percentage">Cashback %</option>
-                </select>
-                <input type="number" id="cbValue" placeholder="0" min="0" step="0.01" />
-              </div>
-              <div class="row" style="margin-top:12px">
-                <select id="recurringType">
-                  <option value="none">One-time</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="half-yearly">Half-Yearly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </div>
-              <div id="recurringOptions" class="recurring-options hidden">
-                <div class="row">
-                  <input type="date" id="endDate" placeholder="End date (optional)" />
-                  <input type="number" id="maxOccurrences" placeholder="Max occurrences (optional)" min="1" />
-                </div>
-              </div>
-              <div style="margin-top:16px" class="row">
-                <button type="submit"><i class="fas fa-plus"></i> Add Transaction</button>
-                <button type="button" id="clearTx" class="ghost"><i class="fas fa-eraser"></i> Clear</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- Filters -->
-        <div class="card mobile-tab-content" id="filterCard" data-tab="transactions">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-filter"></i> Filters</h2>
-          </div>
-          <div class="collapsible-content" id="filtersContent">
-            <div id="filtersArea">
-              <div class="row">
-                <select id="filterType">
-                  <option value="all">All Types</option>
-                  <option value="income">Income</option>
-                  <option value="expense">Expense</option>
-                  <option value="transfer">Transfer</option>
-                </select>
-                <select id="filterAccount">
-                  <option value="all">All Accounts</option>
-                </select>
-                <select id="filterMode">
-                  <option value="all">All Modes</option>
-                  <option value="UPI">UPI</option>
-                  <option value="Debit Card">Debit Card</option>
-                  <option value="Credit Card">Credit Card</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Netbanking">Netbanking</option>
-                  <option value="Wallet">Wallet</option>
-                </select>
-              </div>
-              <div class="row" style="margin-top:12px">
-                <select id="filterCategory">
-                  <option value="all">All Categories</option>
-                </select>
-                <select id="filterSubCategory">
-                  <option value="all">All Sub Categories</option>
-                </select>
-              </div>
-              <div class="row" style="margin-top:12px">
-                <input id="filterSearch" type="text" placeholder="Search description..." />
-                <button id="resetFilters" class="ghost smallBtn"><i class="fas fa-times"></i> Reset</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Transactions -->
-        <div class="card mobile-tab-content" id="txListCard" data-tab="transactions">
-          <div class="collapsible-content" id="txListContent">
-            <div id="txListSummary"></div>
-            <div id="transactionsList"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right -->
-      <div class="col">
-        <div class="card mobile-tab-content" id="initBalancesCard" data-tab="accounts">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-piggy-bank"></i> Initial Balances</h2>
-          </div>
-          <div class="collapsible-content" id="initBalancesContent">
-            <div id="initialBalancesArea"></div>
-          </div>
-        </div>
-
-        <div class="card mobile-tab-content" id="accountsCard" data-tab="accounts">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-university"></i> Accounts</h2>
-          </div>
-          <div class="collapsible-content" id="accountsContent">
-            <div style="margin-bottom:12px">
-              <button id="addAccountBtn" class="smallBtn"><i class="fas fa-plus"></i> Add Account</button>
-            </div>
-            <div id="accountsArea"></div>
-          </div>
-        </div>
-
-        <div class="card mobile-tab-content" id="categoriesCard" data-tab="categories">
-          <div class="sectionTitle">
-            <h2><i class="fas fa-tags"></i> Categories</h2>
-          </div>
-          <div class="collapsible-content" id="categoriesContent">
-            <div style="margin-bottom:12px">
-              <button id="addCategoryBtn" class="smallBtn"><i class="fas fa-plus"></i> Add Category</button>
-            </div>
-            <div id="categoriesArea"></div>
-          </div>
-        </div>
-      </div>
-    </main>
-
-    <footer>
-      <div class="muted"><i class="fas fa-database"></i> Data stored locally in your browser. Use Export JSON to back up your data.</div>
-    </footer>
-  </div>
-
-  <!-- Floating Add Button (Mobile Only) -->
-  <button class="floating-add-btn" id="floatingAddBtn">
-    <i class="fas fa-plus"></i>
-  </button>
-
-  <!-- Mobile Add Transaction Panel -->
-  <div id="mobileAddPanel">
-    <div id="mobileAddPanelHeader">
-      <h3><i class="fas fa-plus-circle"></i> Add Transaction</h3>
-      <button id="closeMobileAddPanel">&times;</button>
-    </div>
-    <form id="mobileTxForm">
-      <div class="row">
-        <select id="mobileTxType">
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-          <option value="transfer">Transfer</option>
-        </select>
-        <select id="mobileTxMode">
-          <option value="UPI">UPI</option>
-          <option value="Debit Card">Debit Card</option>
-          <option value="Credit Card">Credit Card</option>
-          <option value="Cash">Cash</option>
-          <option value="Netbanking">Netbanking</option>
-          <option value="Wallet">Wallet</option>
+  <main>
+    <!-- Transactions Section -->
+    <section id="transactionsSection">
+      <div class="filters">
+        <label for="filterAccountType">Filter by Account Type:</label>
+        <select id="filterAccountType" aria-label="Filter transactions by account type">
+          <option value="">All</option>
+          <option value="bank">Bank</option>
+          <option value="wallet">Wallet</option>
+          <option value="cc">Credit Card</option>
+          <option value="cash">Cash</option>
         </select>
       </div>
-      <input type="date" id="mobileTxDate" style="margin-bottom: 12px;" />
-      <div id="mobileFromToWrap">
-        <label>From Account</label>
-        <select id="mobileTxFrom"></select>
-        <div id="mobileToAccountContainer" style="display:none;">
-          <label style="margin-top:12px">To Account</label>
-          <select id="mobileTxTo"></select>
-        </div>
-      </div>
-      <label style="margin-top:12px">Amount (₹)</label>
-      <input type="number" id="mobileTxAmount" min="0" step="0.01" required placeholder="Enter amount" />
-      <label style="margin-top:12px">Description (optional)</label>
-      <input type="text" id="mobileTxDesc" placeholder="Enter description" />
-      <label style="margin-top:12px">Category</label>
-      <select id="mobileTxCategory">
-        <option value="">Select Category</option>
-      </select>
-      <label style="margin-top:12px">Sub Category (optional)</label>
-      <select id="mobileTxSubCategory">
-        <option value="">Select Sub Category</option>
-      </select>
-      <div class="row" style="margin-top:12px">
-        <select id="mobileCbType">
-          <option value="amount">Cashback ₹</option>
-          <option value="percentage">Cashback %</option>
-        </select>
-        <input type="number" id="mobileCbValue" placeholder="0" min="0" step="0.01" />
-      </div>
-      <div class="row" style="margin-top:12px">
-        <select id="mobileRecurringType">
-          <option value="none">One-time</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="half-yearly">Half-Yearly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-      </div>
-      <div id="mobileRecurringOptions" class="mobile-recurring-options hidden">
-        <div class="row">
-          <input type="date" id="mobileEndDate" placeholder="End date (optional)" />
-          <input type="number" id="mobileMaxOccurrences" placeholder="Max occurrences (optional)" min="1" />
-        </div>
-      </div>
-      <div style="margin-top:20px">
-        <button type="submit" style="width:100%;padding:12px;font-size:16px;"><i class="fas fa-plus"></i> Add Transaction</button>
-      </div>
-    </form>
-  </div>
 
-  <!-- Edit Panel -->
-  <div id="editPanelOverlay">
-    <div id="editPanel">
-      <h2><i class="fas fa-edit"></i> Edit Transaction</h2>
-      <form id="editTxForm">
-        <label><i class="fas fa-calendar"></i> Date</label>
-        <input type="date" id="editDate" />
-        <label><i class="fas fa-comment"></i> Description</label>
-        <input type="text" id="editDesc" />
-        <label><i class="fas fa-rupee-sign"></i> Amount (₹)</label>
-        <input type="number" id="editAmount" min="0" step="0.01" />
-        <label><i class="fas fa-credit-card"></i> Mode</label>
-        <select id="editMode">
-          <option value="UPI">UPI</option>
-          <option value="Debit Card">Debit Card</option>
-          <option value="Credit Card">Credit Card</option>
-          <option value="Cash">Cash</option>
-          <option value="Netbanking">Netbanking</option>
-          <option value="Wallet">Wallet</option>
+      <table id="transactionTable">
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Account</th>
+            <th scope="col">Category</th>
+            <th scope="col">Amount</th>
+          </tr>
+        </thead>
+        <tbody id="transactionList">
+          <tr id="emptyTransactions">
+            <td colspan="4">No transactions yet</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Accounts Section -->
+    <section id="accountsSection" hidden>
+      <h2>Accounts</h2>
+      <ul id="accountList"></ul>
+      <form id="addAccountForm">
+        <input type="text" id="accountName" placeholder="Account Name" aria-label="Account Name" required />
+        <select id="accountType" aria-label="Account Type">
+          <option value="bank">Bank</option>
+          <option value="wallet">Wallet</option>
+          <option value="cc">Credit Card</option>
+          <option value="cash">Cash</option>
         </select>
-        <label><i class="fas fa-exchange-alt"></i> Transaction Type</label>
-        <select id="editType">
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-          <option value="transfer">Transfer</option>
-        </select>
-        <div id="editFromToWrap">
-          <label><i class="fas fa-arrow-circle-right"></i> From Account</label>
-          <select id="editFrom"></select>
-          <div id="editToAccountContainer" style="display:none;">
-            <label style="margin-top:12px"><i class="fas fa-arrow-circle-left"></i> To Account</label>
-            <select id="editTo"></select>
-          </div>
-        </div>
-        <label><i class="fas fa-tags"></i> Category</label>
-        <select id="editCategory">
-          <option value="">Select Category</option>
-        </select>
-        <label><i class="fas fa-tag"></i> Sub Category</label>
-        <select id="editSubCategory">
-          <option value="">Select Sub Category</option>
-        </select>
-        <label><i class="fas fa-redo"></i> Recurring Type</label>
-        <select id="editRecurringType">
-          <option value="none">One-time</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="quarterly">Quarterly</option>
-          <option value="half-yearly">Half-Yearly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-        <div id="editRecurringOptions" class="recurring-options">
-          <label><i class="fas fa-calendar-times"></i> End Date (optional)</label>
-          <input type="date" id="editEndDate" />
-          <label><i class="fas fa-repeat"></i> Max Occurrences (optional)</label>
-          <input type="number" id="editMaxOccurrences" min="1" />
-        </div>
-        <button type="submit" style="margin-top: 20px;"><i class="fas fa-save"></i> Save Changes</button>
-        <button type="button" id="deleteTxBtn" class="delete-transaction-btn"><i class="fas fa-trash"></i> Delete Transaction</button>
-        <button type="button" id="stopRecurringBtn" class="ghost danger" style="margin-top: 10px;"><i class="fas fa-stop"></i> Stop Recurring</button>
-        <button type="button" id="closeEditBtn" class="ghost" style="margin-top: 10px;"><i class="fas fa-times"></i> Cancel</button>
+        <button type="submit">Add Account</button>
       </form>
-    </div>
-  </div>
+    </section>
 
-  <script src="script.js"></script>
+    <!-- Add Transaction Panel -->
+    <section id="addTransactionPanel">
+      <h2>Add Transaction</h2>
+      <form id="addTransactionForm">
+        <input type="date" id="txnDate" required aria-label="Transaction Date" />
+        <input type="number" id="txnAmount" step="0.01" placeholder="Amount" required aria-label="Transaction Amount" />
+        <select id="txnAccount" required aria-label="Transaction Account"></select>
+        <input type="text" id="txnCategory" placeholder="Category" required aria-label="Transaction Category" />
+        <button type="submit">Add</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
 </body>
 </html>
