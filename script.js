@@ -1,122 +1,2147 @@
-// ===== STATE =====
-let transactions = JSON.parse(localStorage.getItem("transactions") || "[]");
-let accounts = JSON.parse(localStorage.getItem("accounts") || "[]");
-let sortBy = "date"; // default sort
-let sortOrder = "desc"; // latest first
+<script>
+    /* ====== State & Storage ====== */
+    const STORAGE_KEY = 'dailyTransactionsAppData_v5';
+    let data = { 
+      accounts: [], 
+      transactions: [], 
+      initialBalances: {}, 
+      recurringTransactions: [],
+      categories: [],
+      subAccounts: {},
+      subAccountBalances: {},
+      creditCardBillingCycles: {}
+    };
+    let activeSummary = null; // 'income' | 'expense' | 'net' | null
+    let editingTxIndex = null;
+    let currentTab = 'transactions'; // Track current active tab for swipe navigation
+    let activeCategoryTab = 'expense'; // Track active category tab
+    let sortOrder = 'oldToNew'; // 'oldToNew' | 'newToOld'
+	let expandedAccount = null; // remember which account is expanded across re-renders
+    // Default categories and subcategories based on Amazon.in
+    const defaultCategories = [
+      {
+        name: 'Electronics',
+        color: '#1e90ff',
+        subcategories: ['Mobiles', 'Laptops', 'Tablets', 'Cameras', 'Audio', 'Gaming', 'Accessories'],
+        type: 'expense'
+      },
+      {
+        name: 'Fashion',
+        color: '#4169e1',
+        subcategories: ['Men\'s Clothing', 'Women\'s Clothing', 'Kids\' Clothing', 'Footwear', 'Watches', 'Jewellery', 'Bags & Luggage'],
+        type: 'expense'
+      },
+      {
+        name: 'Home & Kitchen',
+        color: '#6495ed',
+        subcategories: ['Furniture', 'Home Decor', 'Kitchen & Dining', 'Bedding', 'Bath', 'Lighting', 'Storage'],
+        type: 'expense'
+      },
+      {
+        name: 'Books',
+        color: '#87cefa',
+        subcategories: ['Fiction', 'Non-Fiction', 'Academic', 'Children\'s Books', 'Comics', 'Textbooks'],
+        type: 'expense'
+      },
+      {
+        name: 'Beauty',
+        color: '#4682b4',
+        subcategories: ['Makeup', 'Skincare', 'Haircare', 'Fragrances', 'Tools & Accessories', 'Men\'s Grooming'],
+        type: 'expense'
+      },
+      {
+        name: 'Sports',
+        color: '#5f9ea0',
+        subcategories: ['Cricket', 'Badminton', 'Football', 'Fitness', 'Cycling', 'Swimming', 'Outdoor'],
+        type: 'expense'
+      },
+      {
+        name: 'Grocery',
+        color: '#708090',
+        subcategories: ['Fruits & Vegetables', 'Bakery', 'Beverages', 'Snacks', 'Staples', 'Dairy', 'Pet Supplies'],
+        type: 'expense'
+      },
+      {
+        name: 'Toys',
+        color: '#778899',
+        subcategories: ['Action Figures', 'Dolls', 'Educational', 'Puzzles', 'Remote Control', 'Soft Toys', 'Board Games'],
+        type: 'expense'
+      },
+      {
+        name: 'Automotive',
+        color: '#696969',
+        subcategories: ['Car Accessories', 'Bike Accessories', 'Tools & Equipment', 'Tyres', 'Helmets', 'Spare Parts'],
+        type: 'expense'
+      },
+      {
+        name: 'Health',
+        color: '#87ceeb',
+        subcategories: ['Medicines', 'Healthcare Devices', 'Nutrition', 'Personal Care', 'Fitness Supplements'],
+        type: 'expense'
+      },
+      {
+        name: 'Bill Payments',
+        color: '#b0c4de',
+        subcategories: [
+          'Electricity Bill', 
+          'Water Bill', 
+          'Gas Bill', 
+          'Internet Bill', 
+          'Mobile Recharge', 
+          'DTH Recharge', 
+          'Insurance Premium', 
+          'Loan EMI', 
+          'Credit Card Bill', 
+          'Municipal Tax', 
+          'Rent', 
+          'Subscription Fees'
+        ],
+        type: 'expense'
+      },
+      {
+        name: 'Salary',
+        color: '#00bfff',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Interest',
+        color: '#1e90ff',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Refund',
+        color: '#87cefa',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Investment Returns',
+        color: '#4682b4',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Gift',
+        color: '#5f9ea0',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Bonus',
+        color: '#708090',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Freelance',
+        color: '#778899',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Business',
+        color: '#696969',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Other Income',
+        color: '#87ceeb',
+        subcategories: [],
+        type: 'income'
+      },
+      {
+        name: 'Bank Transfer',
+        color: '#6495ed',
+        subcategories: ['NEFT', 'RTGS', 'IMPS'],
+        type: 'transfer'
+      },
+      {
+        name: 'Cash Transfer',
+        color: '#87cefa',
+        subcategories: ['ATM Withdrawal', 'Cash Deposit'],
+        type: 'transfer'
+      },
+      {
+        name: 'Wallet Transfer',
+        color: '#4682b4',
+        subcategories: ['Paytm', 'PhonePe', 'Google Pay'],
+        type: 'transfer'
+      }
+    ];
 
-// ===== DOM ELEMENTS =====
-const transactionList = document.getElementById("transactionList");
-const txnForm = document.getElementById("addTransactionForm");
-const accountForm = document.getElementById("addAccountForm");
-const txnAccountSelect = document.getElementById("txnAccount");
-const filterAccountType = document.getElementById("filterAccountType");
-const emptyRow = document.getElementById("emptyTransactions");
-
-// ===== HELPERS =====
-function saveData() {
-  localStorage.setItem("transactions", JSON.stringify(transactions));
-  localStorage.setItem("accounts", JSON.stringify(accounts));
-}
-
-function formatAmount(val) {
-  return (Math.round(val * 100) / 100).toFixed(2);
-}
-
-function renderAccounts() {
-  const list = document.getElementById("accountList");
-  list.innerHTML = "";
-  txnAccountSelect.innerHTML = "";
-
-  accounts.forEach(acc => {
-    const li = document.createElement("li");
-    li.textContent = `${acc.name} (${acc.type})`;
-    list.appendChild(li);
-
-    const opt = document.createElement("option");
-    opt.value = acc.name;
-    opt.textContent = `${acc.name} (${acc.type})`;
-    txnAccountSelect.appendChild(opt);
-  });
-}
-
-function renderTransactions() {
-  transactionList.innerHTML = "";
-  let filtered = transactions.slice();
-
-  if (filterAccountType.value) {
-    filtered = filtered.filter(txn => {
-      const acc = accounts.find(a => a.name === txn.account);
-      return acc && acc.type === filterAccountType.value;
-    });
-  }
-
-  filtered.sort((a, b) => {
-    if (sortBy === "date") {
-      return sortOrder === "asc"
-        ? new Date(a.date) - new Date(b.date)
-        : new Date(b.date) - new Date(a.date);
+    function loadData(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw) data = JSON.parse(raw);
+      } catch(e){ console.warn('loadData err', e); }
+      
+      // Initialize default categories if none exist
+      if (!data.categories || data.categories.length === 0) {
+        data.categories = defaultCategories;
+      }
+      
+      // Initialize subAccounts if not exist
+      if (!data.subAccounts) {
+        data.subAccounts = {};
+      }
+      
+      // Initialize subAccountBalances if not exist
+      if (!data.subAccountBalances) {
+        data.subAccountBalances = {};
+      }
+      
+      // Initialize creditCardBillingCycles if not exist
+      if (!data.creditCardBillingCycles) {
+        data.creditCardBillingCycles = {};
+      }
+	  // Initialize creditCardViewPref if not exist
+	  if (!data.creditCardViewPref) {
+		data.creditCardViewPref = {};
+		}
+     
+      // Ensure all categories have a type
+      data.categories.forEach(cat => {
+        if (!cat.type) {
+          cat.type = 'expense'; // Default to expense for existing categories
+        }
+      });
     }
-    return 0;
-  });
+    
+    function saveData(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+    
+    function generateId(){ return '_' + Math.random().toString(36).slice(2,11); }
+    function formatCurrency(v){ return '₹' + (Number(v)||0).toFixed(2); }
 
-  if (filtered.length === 0) {
-    transactionList.appendChild(emptyRow);
-    emptyRow.hidden = false;
-    return;
-  }
+    /* ====== DOM refs ====== */
+    const txForm = document.getElementById('txForm');
+    const txType = document.getElementById('txType');
+    const txMode = document.getElementById('txMode');
+    const txDate = document.getElementById('txDate');
+    const txFrom = document.getElementById('txFrom');
+    const txTo = document.getElementById('txTo');
+    const txAmount = document.getElementById('txAmount');
+    const txDesc = document.getElementById('txDesc');
+    const txCategory = document.getElementById('txCategory');
+    const txSubCategory = document.getElementById('txSubCategory');
+    const cbType = document.getElementById('cbType');
+    const cbValue = document.getElementById('cbValue');
+    const recurringType = document.getElementById('recurringType');
+    const endDate = document.getElementById('endDate');
+    const maxOccurrences = document.getElementById('maxOccurrences');
+    const recurringOptions = document.getElementById('recurringOptions');
 
-  emptyRow.hidden = true;
-  filtered.forEach(txn => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${txn.date}</td>
-      <td>${txn.account}</td>
-      <td>${txn.category}</td>
-      <td>${formatAmount(txn.amount)}</td>
-    `;
-    transactionList.appendChild(tr);
-  });
+    const mobileTxForm = document.getElementById('mobileTxForm');
+    const mobileTxType = document.getElementById('mobileTxType');
+    const mobileTxMode = document.getElementById('mobileTxMode');
+    const mobileTxDate = document.getElementById('mobileTxDate');
+    const mobileTxFrom = document.getElementById('mobileTxFrom');
+    const mobileTxTo = document.getElementById('mobileTxTo');
+    const mobileTxAmount = document.getElementById('mobileTxAmount');
+    const mobileTxDesc = document.getElementById('mobileTxDesc');
+    const mobileTxCategory = document.getElementById('mobileTxCategory');
+    const mobileTxSubCategory = document.getElementById('mobileTxSubCategory');
+    const mobileCbType = document.getElementById('mobileCbType');
+    const mobileCbValue = document.getElementById('mobileCbValue');
+    const mobileRecurringType = document.getElementById('mobileRecurringType');
+    const mobileEndDate = document.getElementById('mobileEndDate');
+    const mobileMaxOccurrences = document.getElementById('mobileMaxOccurrences');
+    const mobileRecurringOptions = document.getElementById('mobileRecurringOptions');
+
+    const transactionsList = document.getElementById('transactionsList');
+    const txListSummary = document.getElementById('txListSummary');
+
+    const accountsArea = document.getElementById('accountsArea');
+    const initialBalancesArea = document.getElementById('initialBalancesArea');
+    const categoriesArea = document.getElementById('categoriesArea');
+
+    const filterType = document.getElementById('filterType');
+    const filterAccount = document.getElementById('filterAccount');
+    const filterMode = document.getElementById('filterMode');
+    const filterCategory = document.getElementById('filterCategory');
+    const filterSubCategory = document.getElementById('filterSubCategory');
+    const filterSearch = document.getElementById('filterSearch');
+
+    const importFile = document.getElementById('importFile');
+    const exportJsonBtn = document.getElementById('exportJson');
+    const importJsonBtn = document.getElementById('importJsonBtn');
+
+    // Edit panel elements
+    const editType = document.getElementById('editType');
+    const editMode = document.getElementById('editMode');
+    const editFrom = document.getElementById('editFrom');
+    const editTo = document.getElementById('editTo');
+
+    // Sort buttons
+    const sortOldToNewBtn = document.getElementById('sortOldToNew');
+    const sortNewToOldBtn = document.getElementById('sortNewToOld');
+
+    /* ====== Utilities ====== */
+    function getAccountBalance(acc){
+      let bal = Number(data.initialBalances?.[acc]||0);
+      data.transactions.forEach(t=>{
+        if(t.type==='income' && t.to===acc) bal += Number(t.amount) + Number(t.cashbackAmount||0);
+        if(t.type==='expense' && t.from===acc) bal -= (Number(t.amount) - Number(t.cashbackAmount||0));
+        if(t.type==='transfer'){
+          if(t.from===acc) bal -= Number(t.amount);
+          if(t.to===acc) bal += Number(t.amount);
+        }
+      });
+      return bal;
+    }
+
+    function getSubAccountBalance(mainAccount, subAccount) {
+      const key = `${mainAccount}:${subAccount}`;
+      let bal = Number(data.subAccountBalances?.[key] || 0);
+      
+      data.transactions.forEach(t => {
+        if (t.from === key) bal -= Number(t.amount);
+        if (t.to === key) bal += Number(t.amount);
+      });
+      
+      return bal;
+    }
+
+    function getAccountTotalBalance(acc) {
+      // Start with main account balance
+      let totalBal = getAccountBalance(acc);
+      
+      // Add all sub-account balances
+      if (data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+        data.subAccounts[acc].forEach(subAcc => {
+          const key = `${acc}:${subAcc}`;
+          totalBal += getSubAccountBalance(acc, subAcc);
+        });
+      }
+      
+      return totalBal;
+    }
+	    // ---- Credit Card helpers: compute Outstanding + Recent parts ----
+    function lastDayOfMonth(y, m){ return new Date(y, m + 1, 0).getDate(); }
+    function makeSafeDate(y, m, day){
+      // allow m to be <0 or >11 (Date handles it), clamp day to month length
+      const d = new Date(y, m, 1);
+      const safeDay = Math.min(day, lastDayOfMonth(d.getFullYear(), d.getMonth()));
+      return new Date(d.getFullYear(), d.getMonth(), safeDay);
+    }
+
+    function getCycleStart(today, cycleDay){
+      const y = today.getFullYear(), m = today.getMonth();
+      const thisMonthStart = makeSafeDate(y, m, cycleDay);
+      // If today's before billing day this month, current cycle started last month
+      return (today >= thisMonthStart) ? thisMonthStart : makeSafeDate(y, m - 1, cycleDay);
+    }
+
+    function getBillingWindows(cycleDay){
+      const today = new Date();
+      const currentStart = getCycleStart(today, cycleDay);
+      const prevStart = makeSafeDate(currentStart.getFullYear(), currentStart.getMonth() - 1, cycleDay);
+      return { today, currentStart, prevStart };
+    }
+
+    function getCreditCardPartsForKey(key){
+      const cycleDay = data.creditCardBillingCycles?.[key];
+      if(!cycleDay) return null; // no split if cycle day not set
+
+      const { today, currentStart, prevStart } = getBillingWindows(cycleDay);
+      let outstanding = 0, recent = 0;
+
+      data.transactions.forEach(t=>{
+        // Only transactions touching this credit card sub-account
+        if(t.from !== key && t.to !== key) return;
+        if(!t.date) return;
+
+        // Convert to Date once
+        const d = new Date(t.date);
+        const delta = (t.to === key ? Number(t.amount) : -Number(t.amount));
+
+        // Previous cycle: [prevStart, currentStart)
+        if(d >= prevStart && d < currentStart){
+          outstanding += delta;
+        }
+        // Current cycle: [currentStart, today]
+        else if(d >= currentStart && d <= today){
+          recent += delta;
+        }
+      });
+
+      return { outstanding, recent };
+    }
+
+
+    // Get appropriate icon for account based on account name
+    function getAccountIcon(accountName) {
+      const name = accountName.toLowerCase();
+      
+      if (name.includes('credit') || name.includes('card')) {
+        return '<i class="fas fa-credit-card"></i>';
+      } else if (name.includes('bank')) {
+        return '<i class="fas fa-building"></i>';
+      } else if (name.includes('cash')) {
+        return '<i class="fas fa-money-bill-wave"></i>';
+      } else if (name.includes('wallet')) {
+        return '<i class="fas fa-wallet"></i>';
+      } else if (name.includes('investment') || name.includes('stock')) {
+        return '<i class="fas fa-chart-line"></i>';
+      } else if (name.includes('loan') || name.includes('mortgage')) {
+        return '<i class="fas fa-file-invoice-dollar"></i>';
+      } else if (name.includes('savings')) {
+        return '<i class="fas fa-piggy-bank"></i>';
+      } else {
+        return '<i class="fas fa-university"></i>';
+      }
+    }
+
+    // Filter accounts based on payment mode
+    function getFilteredAccounts(mode, txTypeValue) {
+      if (!data.accounts || data.accounts.length === 0) return [];
+      
+      // For transfer transactions, show all accounts regardless of mode
+      if (txTypeValue === 'transfer') {
+        return data.accounts;
+      }
+      
+      switch(mode) {
+        case 'UPI':
+          // UPI shows both bank accounts and credit cards
+          return data.accounts.filter(acc => 
+            acc.toLowerCase().includes('bank') || 
+            acc.toLowerCase().includes('credit') || 
+            acc.toLowerCase().includes('card')
+          );
+        case 'Debit Card':
+        case 'Netbanking':
+          // Only bank accounts
+          return data.accounts.filter(acc => 
+            acc.toLowerCase().includes('bank') && 
+            !acc.toLowerCase().includes('credit') && 
+            !acc.toLowerCase().includes('wallet') &&
+            !acc.toLowerCase().includes('cash')
+          );
+        case 'Credit Card':
+          // Only credit card accounts
+          return data.accounts.filter(acc => 
+            acc.toLowerCase().includes('credit') || 
+            acc.toLowerCase().includes('card')
+          );
+        case 'Wallet':
+          // Only wallet accounts
+          return data.accounts.filter(acc => 
+            acc.toLowerCase().includes('wallet')
+          );
+        case 'Cash':
+          // Only cash accounts
+          return data.accounts.filter(acc => 
+            acc.toLowerCase().includes('cash')
+          );
+        default:
+          return data.accounts;
+      }
+    }
+
+    // Populate account dropdowns with main accounts and their sub-accounts based on mode
+    function populateAccountDropdowns(modeSelect, fromSelect, toSelect, txTypeValue) {
+      const mode = modeSelect.value;
+      const filteredAccounts = getFilteredAccounts(mode, txTypeValue);
+      
+      // Clear current options
+      fromSelect.innerHTML = '';
+      toSelect.innerHTML = '';
+      
+      // Add default option
+      const defaultFromOption = document.createElement('option');
+      defaultFromOption.value = '';
+      defaultFromOption.textContent = 'Select Account';
+      fromSelect.appendChild(defaultFromOption);
+      
+      const defaultToOption = document.createElement('option');
+      defaultToOption.value = '';
+      defaultToOption.textContent = 'Select Account';
+      toSelect.appendChild(defaultToOption);
+      
+      // Add filtered main accounts and their sub-accounts
+      filteredAccounts.forEach(acc => {
+        // Add main account
+        const fromOption = document.createElement('option');
+        fromOption.value = acc;
+        fromOption.textContent = acc;
+        fromSelect.appendChild(fromOption);
+        
+        const toOption = document.createElement('option');
+        toOption.value = acc;
+        toOption.textContent = acc;
+        toSelect.appendChild(toOption);
+        
+        // Add sub-accounts if they exist and belong to the filtered account
+        if (data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+          data.subAccounts[acc].forEach(subAcc => {
+            const key = `${acc}:${subAcc}`;
+            // Check if sub-account matches the mode filter
+            const isSubAccountValid = filteredAccounts.includes(acc);
+            if (isSubAccountValid) {
+              const fromSubOption = document.createElement('option');
+              fromSubOption.value = key;
+              fromSubOption.textContent = `→ ${subAcc}`;
+              fromSelect.appendChild(fromSubOption);
+              
+              const toSubOption = document.createElement('option');
+              toSubOption.value = key;
+              toSubOption.textContent = `→ ${subAcc}`;
+              toSelect.appendChild(toSubOption);
+            }
+          });
+        }
+      });
+    }
+
+    function addRecurringTransactions() {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      data.recurringTransactions = data.recurringTransactions.filter(recurring => {
+        // Skip stopped recurring transactions
+        if (recurring.stopped) return true;
+        
+        const lastDate = new Date(recurring.lastGenerated || recurring.startDate);
+        const end = recurring.endDate ? new Date(recurring.endDate) : null;
+        const maxOcc = recurring.maxOccurrences || null;
+        const occurrences = recurring.occurrences || 0;
+        
+        // Skip if past end date or max occurrences reached
+        if (end && today > end) return true;
+        if (maxOcc && occurrences >= maxOcc) {
+          recurring.stopped = true;
+          return true;
+        }
+        
+        let shouldGenerate = false;
+        let nextDate = new Date(lastDate);
+        
+        switch(recurring.type) {
+          case 'daily':
+            nextDate.setDate(lastDate.getDate() + 1);
+            shouldGenerate = nextDate <= today;
+            break;
+          case 'weekly':
+            nextDate.setDate(lastDate.getDate() + 7);
+            shouldGenerate = nextDate <= today;
+            break;
+          case 'monthly':
+            nextDate.setMonth(lastDate.getMonth() + 1);
+            shouldGenerate = nextDate <= today;
+            break;
+          case 'quarterly':
+            nextDate.setMonth(lastDate.getMonth() + 3);
+            shouldGenerate = nextDate <= today;
+            break;
+          case 'half-yearly':
+            nextDate.setMonth(lastDate.getMonth() + 6);
+            shouldGenerate = nextDate <= today;
+            break;
+          case 'yearly':
+            nextDate.setFullYear(lastDate.getFullYear() + 1);
+            shouldGenerate = nextDate <= today;
+            break;
+        }
+        
+        if (shouldGenerate && nextDate <= today) {
+          // Create new transaction
+          const newTx = {
+            id: generateId(),
+            type: recurring.type,
+            mode: recurring.mode,
+            date: nextDate.toISOString().split('T')[0],
+            from: recurring.from,
+            to: recurring.to,
+            amount: recurring.amount,
+            desc: recurring.desc + ' (Recurring)',
+            category: recurring.category || '',
+            subCategory: recurring.subCategory || '',
+            cashbackAmount: recurring.cashbackAmount || 0
+          };
+          
+          data.transactions.push(newTx);
+          
+          // Update last generated date and occurrences
+          recurring.lastGenerated = nextDate.toISOString().split('T')[0];
+          recurring.occurrences = (recurring.occurrences || 0) + 1;
+          
+          // Check if we've reached max occurrences
+          if (maxOcc && recurring.occurrences >= maxOcc) {
+            recurring.stopped = true;
+          }
+        }
+        
+        return true;
+      });
+      
+      saveData();
+    }
+
+    /* ====== Render Accounts & Initial Balances ====== */
+    function renderAccounts(){
+      accountsArea.innerHTML = '';
+      filterAccount.innerHTML = '<option value="all">All Accounts</option>';
+
+      // Sort accounts alphabetically
+      const sortedAccounts = [...data.accounts].sort((a, b) => a.localeCompare(b));
+
+      sortedAccounts.forEach(acc=>{
+        // account header with expand/collapse
+        const header = document.createElement('div');
+        header.className = 'account-header';
+        header.id = `account-header-${acc}`;
+
+        const left = document.createElement('div');
+        left.className = 'accountName';
+        left.innerHTML = `${getAccountIcon(acc)} ${acc}`;
+        left.style.flex = '1';
+
+        const actions = document.createElement('div');
+        actions.className = 'account-actions';
+
+        const addSubBtn = document.createElement('button');
+        addSubBtn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+        addSubBtn.className = 'smallBtn ghost';
+        addSubBtn.title = 'Add Sub Account';
+        addSubBtn.onclick = (e)=> {
+          e.stopPropagation();
+          const subName = prompt(`Enter sub-account name for ${acc}:`);
+          if(subName && subName.trim() !== '') {
+            if(!data.subAccounts[acc]) data.subAccounts[acc] = [];
+            if(!data.subAccounts[acc].includes(subName)) {
+              data.subAccounts[acc].push(subName);
+              // Initialize sub-account balance
+              const key = `${acc}:${subName}`;
+              if (!data.subAccountBalances[key]) {
+                data.subAccountBalances[key] = 0;
+              }
+              
+              // If it's a credit card, ask for billing cycle
+              if (acc.toLowerCase().includes('credit') || acc.toLowerCase().includes('card')) {
+                const cycleDate = prompt(`Enter billing cycle date (1-31) for ${subName}:`, '1');
+                if (cycleDate && !isNaN(cycleDate) && cycleDate >= 1 && cycleDate <= 31) {
+                  data.creditCardBillingCycles[key] = parseInt(cycleDate);
+                }
+              }
+              
+              saveData();
+              renderAccounts();
+            } else {
+              alert('Sub-account already exists!');
+            }
+          }
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        delBtn.className = 'smallBtn ghost';
+        delBtn.onclick = (e)=> {
+          e.stopPropagation();
+          if(confirm(`Delete account "${acc}" and remove related transactions?`)){
+            deleteAccount(acc);
+          }
+        };
+
+        actions.appendChild(addSubBtn);
+        actions.appendChild(delBtn);
+        header.appendChild(left);
+        header.appendChild(actions);
+        accountsArea.appendChild(header);
+
+        // If this is a Credit Card account, show the toggle switch below the account name
+        const isCreditAccount = acc.toLowerCase().includes('credit') || acc.toLowerCase().includes('card');
+        if (isCreditAccount) {
+          if (!data.creditCardViewPref) data.creditCardViewPref = {};
+          const pref = data.creditCardViewPref[acc] || 'outstanding'; // 'outstanding' | 'recent'
+
+          const ccToggle = document.createElement('div');
+          ccToggle.className = 'cc-toggle';
+		  ccToggle.addEventListener('click', e => e.stopPropagation());
+          const btnOut = document.createElement('button');
+          btnOut.className = 'smallBtn' + (pref === 'outstanding' ? ' active' : '');
+          btnOut.textContent = 'Outstanding';
+          btnOut.title = 'Show previous cycle dues for all sub-accounts';
+          btnOut.onclick = (e)=>{
+            e.stopPropagation();
+            data.creditCardViewPref[acc] = 'outstanding';
+            saveData();
+            renderAccounts();
+          };
+
+          const btnRec = document.createElement('button');
+          btnRec.className = 'smallBtn' + (pref === 'recent' ? ' active' : '');
+          btnRec.textContent = 'Recent';
+          btnRec.title = 'Show current cycle spends for all sub-accounts';
+          btnRec.onclick = (e)=>{
+            e.stopPropagation();
+            data.creditCardViewPref[acc] = 'recent';
+            saveData();
+            renderAccounts();
+          };
+
+          ccToggle.appendChild(btnOut);
+          ccToggle.appendChild(btnRec);
+          accountsArea.appendChild(ccToggle);
+        }
+
+        // account details (total balance)
+        const details = document.createElement('div');
+        details.className = 'account-details';
+        details.id = `account-details-${acc}`;
+        details.style.display = 'none';
+
+        const totalBal = getAccountTotalBalance(acc);
+        const balEl = document.createElement('div');
+        balEl.textContent = `Total Balance: ${formatCurrency(totalBal)}`;
+        balEl.className = 'balance';
+        if(totalBal < 0) balEl.style.color = '#ff6666';
+        details.appendChild(balEl);
+
+        accountsArea.appendChild(details);
+
+        // Render sub-accounts with expand/collapse (sorted alphabetically)
+        if(data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+          const subAccountList = document.createElement('div');
+          subAccountList.className = 'subaccount-list';
+          subAccountList.id = `subaccounts-${acc}`;
+          subAccountList.style.display = 'none'; // Initially hidden
+          
+          // Sort sub-accounts alphabetically
+          const sortedSubAccounts = [...data.subAccounts[acc]].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubAccounts.forEach(subAcc => {
+            const key = `${acc}:${subAcc}`;
+            const subDiv = document.createElement('div');
+            subDiv.className = 'subaccount-item';
+            
+            const subContent = document.createElement('div');
+            subContent.className = 'subaccount-item-content';
+            
+            const nameSection = document.createElement('div');
+            nameSection.className = 'subaccount-name-section';
+            
+            const mainLine = document.createElement('div');
+            mainLine.className = 'subaccount-main-line';
+            mainLine.innerHTML = `<i class="fas fa-level-up-alt fa-rotate-90"></i> ${subAcc}`;
+            
+            nameSection.appendChild(mainLine);
+            
+            // Show billing cycle info for credit cards on second line
+            if (data.creditCardBillingCycles[key]) {
+              const cycleInfo = document.createElement('div');
+              cycleInfo.className = 'billing-cycle-info';
+              cycleInfo.textContent = `Billing: ${data.creditCardBillingCycles[key]}th of month`;
+              nameSection.appendChild(cycleInfo);
+            }
+            
+            const subActions = document.createElement('div');
+            subActions.className = 'subaccount-actions';
+            
+            const editSubBtn = document.createElement('button');
+            editSubBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            editSubBtn.className = 'smallBtn ghost edit-subaccount-btn';
+            editSubBtn.title = 'Edit Sub Account';
+            editSubBtn.onclick = (e)=> {
+              e.stopPropagation();
+              const newName = prompt(`Rename sub-account "${subAcc}" to:`, subAcc);
+              if(newName && newName.trim() !== '' && newName !== subAcc) {
+                // Update sub-account name
+                const oldKey = `${acc}:${subAcc}`;
+                const newKey = `${acc}:${newName}`;
+                
+                // Update data structures
+                data.subAccounts[acc] = data.subAccounts[acc].map(sa => sa === subAcc ? newName : sa);
+                data.subAccountBalances[newKey] = data.subAccountBalances[oldKey];
+                delete data.subAccountBalances[oldKey];
+                
+                if (data.creditCardBillingCycles[oldKey]) {
+                  data.creditCardBillingCycles[newKey] = data.creditCardBillingCycles[oldKey];
+                  delete data.creditCardBillingCycles[oldKey];
+                }
+                
+                saveData();
+                renderAccounts();
+              }
+            };
+            
+            const delSubBtn = document.createElement('button');
+            delSubBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            delSubBtn.className = 'smallBtn ghost delete-subaccount-btn';
+            delSubBtn.title = 'Delete Sub Account';
+            delSubBtn.onclick = (e)=> {
+              e.stopPropagation();
+              if(confirm(`Delete sub-account "${subAcc}"?`)) {
+                data.subAccounts[acc] = data.subAccounts[acc].filter(sa => sa !== subAcc);
+                delete data.subAccountBalances[key];
+                delete data.creditCardBillingCycles[key];
+                saveData();
+                renderAccounts();
+              }
+            };
+            
+            subActions.appendChild(editSubBtn);
+            subActions.appendChild(delSubBtn);
+            // RIGHT-SIDE AMOUNTS: for credit cards (if cycle set), show either Outstanding or Recent as per account-wide toggle
+const isCredit = acc.toLowerCase().includes('credit') || acc.toLowerCase().includes('card');
+
+let rightSideEl;
+if (isCredit && data.creditCardBillingCycles[key]) {
+  const parts = getCreditCardPartsForKey(key);
+  const pref = (data.creditCardViewPref && data.creditCardViewPref[acc]) || 'outstanding';
+  const chosenLabel = (pref === 'recent') ? 'Recent' : 'Outstanding';
+  const chosenAmt = parts ? ((pref === 'recent') ? parts.recent : parts.outstanding) : 0;
+
+  const container = document.createElement('div');
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+
+  const chosenEl = document.createElement('span');
+  chosenEl.textContent = `${chosenLabel}: ${formatCurrency(chosenAmt)}`;
+  chosenEl.className = 'subaccount-amount balance';
+  if (chosenAmt < 0) chosenEl.style.color = '#ff6666';
+
+  container.appendChild(chosenEl);
+  rightSideEl = container;
+} else {
+  const subBal = getSubAccountBalance(acc, subAcc);
+  const subBalEl = document.createElement('span');
+  subBalEl.textContent = formatCurrency(subBal);
+  subBalEl.className = 'subaccount-amount balance';
+  if (subBal < 0) subBalEl.style.color = '#ff6666';
+  rightSideEl = subBalEl;
 }
 
-// ===== EVENT HANDLERS =====
-txnForm.addEventListener("submit", e => {
-  e.preventDefault();
-  const txn = {
-    date: document.getElementById("txnDate").value,
-    amount: parseFloat(document.getElementById("txnAmount").value),
-    account: document.getElementById("txnAccount").value,
-    category: document.getElementById("txnCategory").value
-  };
-  transactions.push(txn);
-  saveData();
-  renderTransactions();
-  txnForm.reset();
-});
+            subContent.appendChild(nameSection);
+            subContent.appendChild(subActions);
+            subContent.appendChild(rightSideEl);
+            subDiv.appendChild(subContent);
+            subAccountList.appendChild(subDiv);
+          });
+          
+          accountsArea.appendChild(subAccountList);
+        }
+		// Restore expansion if this account was previously open
+if (expandedAccount === acc) {
+  details.style.display = 'block';
+  const subListEl = document.getElementById(`subaccounts-${acc}`);
+  if (subListEl) subListEl.style.display = 'block';
+}
+        // Make header clickable to expand/collapse account details and sub-accounts
+        header.onclick = (e) => {
+          // Prevent click from propagating to parent elements
+          e.stopPropagation();
+          
+          // Collapse all other accounts first
+          document.querySelectorAll('.account-details').forEach(d => {
+            if (d.id !== `account-details-${acc}`) {
+              d.style.display = 'none';
+            }
+          });
+          document.querySelectorAll('.subaccount-list').forEach(s => {
+            if (s.id !== `subaccounts-${acc}`) {
+              s.style.display = 'none';
+            }
+          });
+          
+          // Toggle current account
+          const isHidden = details.style.display === 'none';
+          details.style.display = isHidden ? 'block' : 'none';
+          const subAccountList = document.getElementById(`subaccounts-${acc}`);
+          if (subAccountList) {
+            subAccountList.style.display = isHidden ? 'block' : 'none';
+          }
+		  // Remember which account is open
+if (isHidden) {
+  expandedAccount = acc;
+} else if (expandedAccount === acc) {
+  expandedAccount = null;
+}
+        };
 
-accountForm.addEventListener("submit", e => {
-  e.preventDefault();
-  const account = {
-    name: document.getElementById("accountName").value,
-    type: document.getElementById("accountType").value
-  };
-  accounts.push(account);
-  saveData();
-  renderAccounts();
-  accountForm.reset();
-});
+        // Add to filter account dropdown
+        const fopt = document.createElement('option'); 
+        fopt.value = acc; 
+        fopt.textContent = acc;
+        filterAccount.appendChild(fopt);
+        
+        // Add sub-accounts to filter (sorted alphabetically)
+        if(data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+          const sortedSubAccounts = [...data.subAccounts[acc]].sort((a, b) => a.localeCompare(b));
+          sortedSubAccounts.forEach(subAcc => {
+            const key = `${acc}:${subAcc}`;
+            const subFopt = document.createElement('option'); 
+            subFopt.value = key; 
+            subFopt.textContent = `${acc} → ${subAcc}`;
+            filterAccount.appendChild(subFopt);
+          });
+        }
+      });
 
-filterAccountType.addEventListener("change", renderTransactions);
+      // Populate account dropdowns for add transaction form
+      populateAccountDropdowns(txMode, txFrom, txTo, txType.value);
+      populateAccountDropdowns(mobileTxMode, mobileTxFrom, mobileTxTo, mobileTxType.value);
+      populateAccountDropdowns(editMode, editFrom, editTo, editType.value);
 
-document.getElementById("tabTransactions").addEventListener("click", () => {
-  document.getElementById("transactionsSection").hidden = false;
-  document.getElementById("accountsSection").hidden = true;
-});
+      renderInitialBalances();
+      updateSummaryBar();
+    }
 
-document.getElementById("tabAccounts").addEventListener("click", () => {
-  document.getElementById("transactionsSection").hidden = true;
-  document.getElementById("accountsSection").hidden = false;
-});
+    function renderInitialBalances(){
+      initialBalancesArea.innerHTML = '';
+      
+      // Sort accounts alphabetically
+      const sortedAccounts = [...data.accounts].sort((a, b) => a.localeCompare(b));
 
-// ===== INIT =====
-renderAccounts();
-renderTransactions();
+      sortedAccounts.forEach(acc=>{
+        // Account header row
+        const accountRow = document.createElement('div');
+        accountRow.className = 'account-balance-row';
+        accountRow.id = `init-balance-header-${acc}`;
+
+        const accountName = document.createElement('div');
+        accountName.innerHTML = `${getAccountIcon(acc)} ${acc}`;
+        accountName.style.fontWeight = '600';
+
+        // Calculate total balance (main + sub-accounts)
+        let totalBalance = getAccountBalance(acc);
+        if(data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+          // Sort sub-accounts alphabetically
+          const sortedSubAccounts = [...data.subAccounts[acc]].sort((a, b) => a.localeCompare(b));
+          sortedSubAccounts.forEach(subAcc => {
+            const key = `${acc}:${subAcc}`;
+            totalBalance += Number(data.subAccountBalances?.[key] || 0);
+          });
+        }
+        
+        const accountBalance = document.createElement('div');
+        accountBalance.textContent = formatCurrency(totalBalance);
+        accountBalance.className = 'balance';
+        if(totalBalance < 0) accountBalance.style.color = '#ff6666';
+
+        accountRow.appendChild(accountName);
+        accountRow.appendChild(accountBalance);
+        initialBalancesArea.appendChild(accountRow);
+
+        // Sub-accounts container (initially hidden)
+        const subAccountsContainer = document.createElement('div');
+        subAccountsContainer.id = `init-subaccounts-${acc}`;
+        subAccountsContainer.style.display = 'none';
+
+        // Main account initial balance input
+        const mainRow = document.createElement('div');
+        mainRow.className = 'subaccount-balance-row';
+
+        const mainLabel = document.createElement('div');
+        mainLabel.textContent = 'Main Account';
+
+        const mainInput = document.createElement('input');
+        mainInput.type = 'number';
+        mainInput.value = Number(data.initialBalances?.[acc]||0);
+        mainInput.placeholder = 'Initial balance';
+        mainInput.style.width = '100px';
+        mainInput.onchange = ()=>{
+          data.initialBalances[acc] = Number(mainInput.value)||0;
+          saveData(); renderAccounts(); renderTransactions();
+        };
+
+        mainRow.appendChild(mainLabel);
+        mainRow.appendChild(mainInput);
+        subAccountsContainer.appendChild(mainRow);
+
+        // Add sub-account balances (sorted alphabetically)
+        if(data.subAccounts[acc] && data.subAccounts[acc].length > 0) {
+          const sortedSubAccounts = [...data.subAccounts[acc]].sort((a, b) => a.localeCompare(b));
+          sortedSubAccounts.forEach(subAcc => {
+            const key = `${acc}:${subAcc}`;
+            const subRow = document.createElement('div');
+            subRow.className = 'subaccount-balance-row';
+
+            const subLabel = document.createElement('div');
+            subLabel.innerHTML = `<i class="fas fa-level-up-alt fa-rotate-90"></i> ${subAcc}`;
+
+            const subInput = document.createElement('input');
+            subInput.type = 'number';
+            subInput.value = Number(data.subAccountBalances?.[key] || 0);
+            subInput.placeholder = 'Initial balance';
+            subInput.style.width = '100px';
+            subInput.onchange = () => {
+              data.subAccountBalances[key] = Number(subInput.value) || 0;
+              saveData();
+              renderAccounts();
+              renderTransactions();
+            };
+
+            subRow.appendChild(subLabel);
+            subRow.appendChild(subInput);
+            subAccountsContainer.appendChild(subRow);
+          });
+        }
+
+        initialBalancesArea.appendChild(subAccountsContainer);
+
+        // Make account header clickable to expand/collapse sub-accounts
+        accountRow.onclick = (e) => {
+          // Prevent click from propagating to parent elements
+          e.stopPropagation();
+          
+          const isHidden = subAccountsContainer.style.display === 'none';
+          subAccountsContainer.style.display = isHidden ? 'block' : 'none';
+        };
+      });
+    }
+
+    function addAccount(name){
+      if(!name) return;
+      if(data.accounts.includes(name)){ alert('Account already exists!'); return; }
+      data.accounts.push(name);
+      data.initialBalances[name] = 0;
+      saveData();
+      renderAccounts(); renderTransactions();
+    }
+    
+    function deleteAccount(acc){
+      data.accounts = data.accounts.filter(a=>a!==acc);
+      data.transactions = data.transactions.filter(t=>t.from!==acc && t.to!==acc);
+      delete data.initialBalances[acc];
+      delete data.subAccounts[acc];
+      // Delete sub-account balances and billing cycles
+      Object.keys(data.subAccountBalances).forEach(key => {
+        if (key.startsWith(`${acc}:`)) {
+          delete data.subAccountBalances[key];
+          delete data.creditCardBillingCycles[key];
+        }
+      });
+      saveData(); renderAccounts(); renderTransactions();
+    }
+
+    /* ====== Render Categories ====== */
+    function renderCategories(){
+      categoriesArea.innerHTML = '';
+      txCategory.innerHTML = '<option value="">Select Category</option>';
+      txCategory.innerHTML += '<option value="">No Category</option>';
+      filterCategory.innerHTML = '<option value="all">All Categories</option>';
+      filterCategory.innerHTML += '<option value="">No Category</option>';
+      document.getElementById('editCategory').innerHTML = '<option value="">Select Category</option>';
+      document.getElementById('editCategory').innerHTML += '<option value="">No Category</option>';
+      mobileTxCategory.innerHTML = '<option value="">Select Category</option>';
+      mobileTxCategory.innerHTML += '<option value="">No Category</option>';
+
+      // Filter categories based on active category tab and sort alphabetically
+      const filteredCategories = data.categories
+        .filter(cat => cat.type === activeCategoryTab)
+        .sort((a, b) => a.name.localeCompare(b));
+
+      filteredCategories.forEach(cat=>{
+        const div = document.createElement('div');
+        div.className = 'category-item';
+        
+        const left = document.createElement('div');
+        left.innerHTML = `<span class="category-color" style="background-color: ${cat.color}"></span> ${cat.name}`;
+        left.style.flex = '1';
+        
+        // Add category type badge
+        const typeBadge = document.createElement('span');
+        typeBadge.className = `category-type-badge category-type-${cat.type}`;
+        typeBadge.textContent = cat.type.charAt(0).toUpperCase() + cat.type.slice(1);
+        left.appendChild(typeBadge);
+        
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.gap = '6px';
+        
+        const addSubBtn = document.createElement('button');
+        addSubBtn.innerHTML = '<i class="fas fa-plus-circle"></i>';
+        addSubBtn.className = 'smallBtn ghost';
+        addSubBtn.title = 'Add Sub Category';
+        addSubBtn.onclick = (e)=> {
+          e.stopPropagation();
+          const subName = prompt(`Enter sub-category name for ${cat.name}:`);
+          if(subName && subName.trim() !== '') {
+            if(!cat.subcategories) cat.subcategories = [];
+            if(!cat.subcategories.includes(subName)) {
+              cat.subcategories.push(subName);
+              saveData();
+              renderCategories();
+            } else {
+              alert('Sub-category already exists!');
+            }
+          }
+        };
+        
+        const delBtn = document.createElement('button');
+        delBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        delBtn.className = 'smallBtn ghost';
+        delBtn.onclick = (e)=> {
+          e.stopPropagation();
+          if(confirm(`Delete category "${cat.name}"?`)) {
+            data.categories = data.categories.filter(c => c.name !== cat.name);
+            saveData();
+            renderCategories();
+            renderTransactions();
+          }
+        };
+        
+        right.appendChild(addSubBtn);
+        right.appendChild(delBtn);
+        div.appendChild(left);
+        div.appendChild(right);
+        categoriesArea.appendChild(div);
+        
+        // Add to select options
+        const opt = document.createElement('option');
+        opt.value = cat.name;
+        opt.textContent = cat.name;
+        txCategory.appendChild(opt);
+        
+        const opt2 = document.createElement('option');
+        opt2.value = cat.name;
+        opt2.textContent = cat.name;
+        filterCategory.appendChild(opt2);
+        
+        const opt3 = document.createElement('option');
+        opt3.value = cat.name;
+        opt3.textContent = cat.name;
+        document.getElementById('editCategory').appendChild(opt3);
+        
+        const mobileOpt = document.createElement('option');
+        mobileOpt.value = cat.name;
+        mobileOpt.textContent = cat.name;
+        mobileTxCategory.appendChild(mobileOpt);
+        
+        // Render subcategories with expand/collapse (sorted alphabetically)
+        if(cat.subcategories && cat.subcategories.length > 0) {
+          const subList = document.createElement('div');
+          subList.className = 'subcategory-list';
+          subList.id = `subcategories-${cat.name}`;
+          subList.style.display = 'none'; // Initially hidden
+          
+          // Sort subcategories alphabetically
+          const sortedSubcategories = [...cat.subcategories].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubcategories.forEach(sub => {
+            const subDiv = document.createElement('div');
+            subDiv.className = 'subcategory-item';
+            
+            const subLeft = document.createElement('div');
+            subLeft.textContent = sub;
+            subLeft.style.flex = '1';
+            
+            const subDelBtn = document.createElement('button');
+            subDelBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            subDelBtn.className = 'smallBtn ghost';
+            subDelBtn.onclick = (e)=> {
+              e.stopPropagation();
+              if(confirm(`Delete sub-category "${sub}"?`)) {
+                cat.subcategories = cat.subcategories.filter(s => s !== sub);
+                saveData();
+                renderCategories();
+              }
+            };
+            
+            subDiv.appendChild(subLeft);
+            subDiv.appendChild(subDelBtn);
+            subList.appendChild(subDiv);
+          });
+          
+          categoriesArea.appendChild(subList);
+          
+          // Make category row clickable to expand/collapse subcategories
+          left.onclick = (e) => {
+            // Prevent click from propagating to parent elements
+            e.stopPropagation();
+            
+            // Collapse all other categories first
+            document.querySelectorAll('.subcategory-list').forEach(sl => {
+              if (sl.id !== `subcategories-${cat.name}`) {
+                sl.classList.remove('expanded');
+                sl.style.display = 'none';
+              }
+            });
+            
+            // Toggle current category
+            subList.classList.toggle('expanded');
+            subList.style.display = subList.style.display === 'none' ? 'block' : 'none';
+          };
+        }
+      });
+      
+      // Update subcategory dropdowns
+      updateSubCategoryDropdowns();
+      updateMobileSubCategoryDropdowns();
+    }
+
+    function updateSubCategoryDropdowns() {
+      const selectedCategory = txCategory.value;
+      txSubCategory.innerHTML = '<option value="">Select Sub Category</option>';
+      txSubCategory.innerHTML += '<option value="">No Sub Category</option>';
+      document.getElementById('editSubCategory').innerHTML = '<option value="">Select Sub Category</option>';
+      document.getElementById('editSubCategory').innerHTML += '<option value="">No Sub Category</option>';
+      filterSubCategory.innerHTML = '<option value="all">All Sub Categories</option>';
+      filterSubCategory.innerHTML += '<option value="">No Sub Category</option>';
+
+      if (selectedCategory) {
+        const category = data.categories.find(c => c.name === selectedCategory);
+        if (category && category.subcategories) {
+          // Sort subcategories alphabetically
+          const sortedSubcategories = [...category.subcategories].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubcategories.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = sub;
+            txSubCategory.appendChild(opt);
+            
+            const opt2 = document.createElement('option');
+            opt2.value = sub;
+            opt2.textContent = sub;
+            document.getElementById('editSubCategory').appendChild(opt2);
+            
+            const opt3 = document.createElement('option');
+            opt3.value = sub;
+            opt3.textContent = sub;
+            filterSubCategory.appendChild(opt3);
+          });
+        }
+      }
+    }
+
+    function updateMobileSubCategoryDropdowns() {
+      const selectedCategory = mobileTxCategory.value;
+      mobileTxSubCategory.innerHTML = '<option value="">Select Sub Category</option>';
+      mobileTxSubCategory.innerHTML += '<option value="">No Sub Category</option>';
+
+      if (selectedCategory) {
+        const category = data.categories.find(c => c.name === selectedCategory);
+        if (category && category.subcategories) {
+          // Sort subcategories alphabetically
+          const sortedSubcategories = [...category.subcategories].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubcategories.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = sub;
+            mobileTxSubCategory.appendChild(opt);
+          });
+        }
+      }
+    }
+
+    function addCategory(name, color, type){
+      if(!name) return;
+      if(data.categories.some(c => c.name === name)){ alert('Category already exists!'); return; }
+      data.categories.push({ name, color: color || '#1e90ff', subcategories: [], type: type || 'expense' });
+      saveData();
+      renderCategories();
+    }
+
+    /* ====== Summary Bar (top) update & interactivity ====== */
+    function updateSummaryBar(){
+      let totalIncome=0, totalExpense=0;
+      data.transactions.forEach(t=>{
+        if(t.type==='income') totalIncome += Number(t.amount) + Number(t.cashbackAmount||0);
+        if(t.type==='expense') totalExpense += Number(t.amount) - Number(t.cashbackAmount||0);
+      });
+      const net = data.accounts.reduce((s,acc)=> s + getAccountTotalBalance(acc), 0);
+
+      document.getElementById('summaryIncome').textContent = formatCurrency(totalIncome);
+      document.getElementById('summaryExpense').textContent = formatCurrency(totalExpense);
+
+      const netEl = document.getElementById('summaryNet');
+      netEl.textContent = formatCurrency(net);
+      netEl.style.color = net < 0 ? '#ff6666' : '#4dff4d';
+    }
+
+    function highlightSummaryBox(activeId){
+      document.querySelectorAll('#summaryBar > div').forEach(d => d.classList.remove('active'));
+      activeSummary = null;
+      if(!activeId) return;
+      document.getElementById(activeId).classList.add('active');
+      if(activeId === 'summaryIncomeBox') activeSummary = 'income';
+      if(activeId === 'summaryExpenseBox') activeSummary = 'expense';
+      if(activeId === 'summaryNetBox') activeSummary = 'net';
+    }
+
+    document.getElementById('summaryIncomeBox').onclick = ()=>{ filterType.value='income'; renderTransactions(); highlightSummaryBox('summaryIncomeBox'); };
+    document.getElementById('summaryExpenseBox').onclick = ()=>{ filterType.value='expense'; renderTransactions(); highlightSummaryBox('summaryExpenseBox'); };
+    document.getElementById('summaryNetBox').onclick = ()=>{ filterType.value='all'; filterMode.value='all'; filterAccount.value='all'; filterSearch.value=''; renderTransactions(); highlightSummaryBox('summaryNetBox'); };
+
+    /* ====== Render Transactions (with mini-summary, chip, animations, clickable items) ====== */
+    function renderTransactions(){
+      // reapply activeSummary state
+      if(activeSummary === 'income') filterType.value='income';
+      else if(activeSummary === 'expense') filterType.value='expense';
+      else if(activeSummary === 'net'){ filterType.value='all'; filterMode.value='all'; filterAccount.value='all'; filterSearch.value=''; }
+
+      // filtering
+      let filtered = data.transactions.slice();
+      if(filterType.value !== 'all') filtered = filtered.filter(t => t.type === filterType.value);
+      if(filterMode.value !== 'all') filtered = filtered.filter(t => t.mode === filterMode.value);
+      if(filterAccount.value !== 'all') filtered = filtered.filter(t => (t.from===filterAccount.value || t.to===filterAccount.value));
+      if(filterCategory.value !== 'all') filtered = filtered.filter(t => t.category === filterCategory.value);
+      if(filterSubCategory.value !== 'all') filtered = filtered.filter(t => t.subCategory === filterSubCategory.value);
+      if(filterSearch.value && filterSearch.value.trim() !== '') filtered = filtered.filter(t => (t.desc||'').toLowerCase().includes(filterSearch.value.toLowerCase()));
+
+      // mini summary breakdown
+      const filteredCount = filtered.length;
+      let incomeTotal=0, expenseTotal=0, transferTotal=0;
+      filtered.forEach(t=>{
+        if(t.type==='income') incomeTotal += Number(t.amount) + Number(t.cashbackAmount||0);
+        if(t.type==='expense') expenseTotal += Number(t.amount) - Number(t.cashbackAmount||0);
+        if(t.type==='transfer') transferTotal += Number(t.amount);
+      });
+      const netTotal = incomeTotal - expenseTotal;
+
+      // filters active?
+      const filtersActive = (filterType.value!=='all' || filterMode.value!=='all' || filterAccount.value!=='all' || filterCategory.value!=='all' || filterSubCategory.value!=='all' || (filterSearch.value && filterSearch.value.trim() !== ''));
+
+      // build summary HTML
+      let summaryHTML = '';
+      if(filteredCount > 0){
+        summaryHTML = (filtersActive ? `<span class="filterTag" id="filterTag"><i class="fas fa-filter"></i> Filtered View ×</span> ` : '') +
+          `Showing ${filteredCount} ${filterType.value !== 'all' ? filterType.value : 'transactions'} | ` +
+          `<span class="income summaryItem" data-filter="income"><i class="fas fa-arrow-down"></i> Income: ${formatCurrency(incomeTotal)}</span> | ` +
+          `<span class="expense summaryItem" data-filter="expense"><i class="fas fa-arrow-up"></i> Expense: ${formatCurrency(expenseTotal)}</span> | ` +
+          `<span class="transfer summaryItem" data-filter="transfer"><i class="fas fa-exchange-alt"></i> Transfer: ${formatCurrency(transferTotal)}</span> | ` +
+          `<span class="net ${netTotal>0?'positive':(netTotal<0?'negative':'neutral')} summaryItem" data-filter="all"><i class="fas fa-balance-scale"></i> Net: ${formatCurrency(netTotal)}</span>`;
+      } else {
+        summaryHTML = '<i class="fas fa-info-circle"></i> No transactions found.';
+      }
+
+      txListSummary.innerHTML = summaryHTML;
+
+      // attach events for summary items
+      setTimeout(()=>{
+        // show chip if exists
+        const chip = document.getElementById('filterTag');
+        if(chip){
+          chip.onclick = ()=> {
+            filterType.value='all'; filterMode.value='all'; filterAccount.value='all'; filterCategory.value='all'; filterSubCategory.value='all'; filterSearch.value='';
+            highlightSummaryBox('summaryNetBox');
+            renderTransactions();
+          };
+        }
+
+        // summary items clickable
+        const items = Array.from(document.querySelectorAll('#txListSummary .summaryItem'));
+        items.forEach((el)=>{
+          el.onclick = () => {
+            const f = el.dataset.filter;
+            if(f === 'income' || f === 'expense') {
+              filterType.value = f;
+              highlightSummaryBox(f==='income'?'summaryIncomeBox':'summaryExpenseBox');
+            } else if(f === 'transfer') {
+              filterType.value = 'transfer';
+              highlightSummaryBox(null);
+            } else {
+              filterType.value = 'all';
+              filterMode.value='all'; filterAccount.value='all'; filterCategory.value='all'; filterSubCategory.value='all'; filterSearch.value='';
+              highlightSummaryBox('summaryNetBox');
+            }
+            renderTransactions();
+          };
+        });
+      }, 30);
+
+      // render items with animation
+      renderTxItems(filtered);
+      updateSummaryBar();
+    }
+
+    function renderTxItems(filtered){
+      // clear list
+      transactionsList.innerHTML = '';
+
+      // Sort transactions based on selected order
+      let arr = filtered.slice();
+      if (sortOrder === 'oldToNew') {
+        arr = arr.sort((a, b) => new Date(a.date) - new Date(b.date));
+      } else {
+        arr = arr.sort((a, b) => new Date(b.date) - new Date(a.date));
+      }
+
+      arr.forEach((tx, idx)=>{
+        const li = document.createElement('div');
+        li.className = 'item';
+        // left text
+        const icon = tx.type === 'income' ? '<i class="fas fa-arrow-down" style="color:#4dff4d"></i>' : tx.type === 'expense' ? '<i class="fas fa-arrow-up" style="color:#ff6666"></i>' : '<i class="fas fa-exchange-alt" style="color:#66ccff"></i>';
+        const accountsText = tx.type === 'transfer' ? `<span class="txAccounts">${tx.from} → ${tx.to}</span>` : (tx.type === 'income' ? `<span class="txAccounts">→ ${tx.to}</span>` : `<span class="txAccounts">${tx.from} →</span>`);
+        const cbText = (Number(tx.cashbackAmount)||0) > 0 ? `<span class="txCashback">+${formatCurrency(Number(tx.cashbackAmount))}</span>` : '';
+        
+        // Find recurring transaction if exists
+        const recurring = data.recurringTransactions.find(rt => rt.id === tx.id);
+        let recurringBadge = '';
+        let recurringInfo = '';
+        
+        if (recurring) {
+          const badgeClass = recurring.stopped ? 'recurring-badge recurring-stopped' : 'recurring-badge';
+          recurringBadge = `<span class="${badgeClass}">${recurring.stopped ? 'Stopped' : 'Recurring'}</span>`;
+          
+          if (!recurring.stopped) {
+            const occurrences = recurring.occurrences || 0;
+            const maxOcc = recurring.maxOccurrences || '∞';
+            const endDateInfo = recurring.endDate ? `Ends: ${recurring.endDate}` : '';
+            const occInfo = `${occurrences}/${maxOcc} occurrences`;
+            recurringInfo = `<div class="recurring-info">${occInfo}${endDateInfo ? ` | ${endDateInfo}` : ''}</div>`;
+          }
+        }
+
+        // Mobile layout with two lines
+        li.innerHTML = `
+          <div class="tx-line-1">
+            <span class="txIcon">${icon}</span>
+            <span class="tx-date">${tx.date}</span>
+            <span class="tx-description">
+              ${tx.desc || '<span class="muted">No description</span>'}
+            </span>
+            <span class="tx-amount-container">
+              <div class="tx-amount-cashback">
+                <span class="txAmount ${tx.type} tx-amount-value">${formatCurrency(tx.amount)}</span>
+                ${(Number(tx.cashbackAmount)||0) > 0 ? `<span class="tx-cashback-value">+${formatCurrency(Number(tx.cashbackAmount))}</span>` : ''}
+              </div>
+            </span>
+          </div>
+          <div class="tx-line-2">
+            <span class="tx-category-inline">${tx.category || 'No Category'}</span>
+            <span class="tx-accounts-container">${accountsText}</span>
+          </div>
+        `;
+
+        transactionsList.appendChild(li);
+
+        // show container
+        setTimeout(()=> li.classList.add('show'), 10 + idx*20);
+
+        // click to open editor
+        li.addEventListener('click', (e)=>{
+          // find real index in data.transactions
+          const txId = tx.id;
+          const realIndex = data.transactions.findIndex(t=>t.id===txId);
+          if(realIndex !== -1) openEditPanel(data.transactions[realIndex], realIndex);
+        });
+      });
+    }
+
+    /* ====== Add Transaction Form ====== */
+    txForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      addTransactionFromForm(txType, txMode, txDate, txFrom, txTo, txAmount, txDesc, txCategory, txSubCategory, cbType, cbValue, recurringType, endDate, maxOccurrences);
+    });
+
+    mobileTxForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      addTransactionFromForm(mobileTxType, mobileTxMode, mobileTxDate, mobileTxFrom, mobileTxTo, mobileTxAmount, mobileTxDesc, mobileTxCategory, mobileTxSubCategory, mobileCbType, mobileCbValue, mobileRecurringType, mobileEndDate, mobileMaxOccurrences);
+      closeMobileAddPanel();
+    });
+
+    function addTransactionFromForm(typeEl, modeEl, dateEl, fromEl, toEl, amountEl, descEl, categoryEl, subCategoryEl, cbTypeEl, cbValueEl, recurringTypeEl, endDateEl, maxOccurrencesEl) {
+      // validation
+      const type = typeEl.value;
+      const amt = Number(amountEl.value) || 0;
+      if(amt <= 0){ alert('Please enter a valid amount'); return; }
+      
+      // Validate account fields based on transaction type
+      if(type === 'transfer') {
+        if(!fromEl.value || !toEl.value){ alert('Please select both From and To accounts'); return; }
+        if(fromEl.value === toEl.value){ alert('From and To accounts cannot be the same'); return; }
+      } else if(type === 'income') {
+        if(!toEl.value){ alert('Please select To account'); return; }
+      } else if(type === 'expense') {
+        if(!fromEl.value){ alert('Please select From account'); return; }
+      }
+
+      let cashback = 0;
+      if(cbValueEl && cbValueEl.value){
+        if(cbTypeEl.value === 'amount') cashback = Number(cbValueEl.value) || 0;
+        else cashback = Math.floor((Number(cbValueEl.value)||0) * amt / 100); // Round down to nearest integer
+      }
+
+      const tx = {
+        id: generateId(),
+        type,
+        mode: modeEl.value,
+        date: (dateEl ? dateEl.value : new Date().toISOString().split('T')[0]) || new Date().toISOString().split('T')[0],
+        from: type === 'income' ? null : fromEl.value || null,
+        to: type === 'expense' ? null : toEl.value || null,
+        amount: amt,
+        desc: descEl.value || '',
+        category: categoryEl.value || '',
+        subCategory: subCategoryEl.value || '',
+        cashbackAmount: Number(cashback)||0
+      };
+
+      data.transactions.push(tx);
+      
+      // Handle recurring transaction
+      if(recurringTypeEl && recurringTypeEl.value !== 'none') {
+        const recurring = {
+          id: tx.id,
+          type: recurringTypeEl.value,
+          mode: modeEl.value,
+          startDate: tx.date,
+          endDate: endDateEl ? endDateEl.value : null,
+          maxOccurrences: maxOccurrencesEl ? (maxOccurrencesEl.value ? Number(maxOccurrencesEl.value) : null) : null,
+          lastGenerated: tx.date,
+          occurrences: 0,
+          stopped: false,
+          from: tx.from,
+          to: tx.to,
+          amount: amt,
+          desc: descEl.value || '',
+          category: categoryEl.value || '',
+          subCategory: subCategoryEl.value || '',
+          cashbackAmount: Number(cashback)||0
+        };
+        data.recurringTransactions.push(recurring);
+      }
+
+      saveData();
+      
+      // Reset forms
+      if (typeEl === txType) {
+        txForm.reset();
+        // Repopulate account dropdowns after reset
+        populateAccountDropdowns(txMode, txFrom, txTo, txType.value);
+        // Update account fields visibility
+        updateAccountFieldsVisibility(txType.value, 'tx');
+      } else {
+        mobileTxForm.reset();
+        // Set today's date as default for mobile form
+        mobileTxDate.valueAsDate = new Date();
+        // Repopulate account dropdowns after reset
+        populateAccountDropdowns(mobileTxMode, mobileTxFrom, mobileTxTo, mobileTxType.value);
+        // Update account fields visibility
+        updateAccountFieldsVisibility(mobileTxType.value, 'mobile');
+      }
+      
+      renderTransactions();
+      renderAccounts();
+    }
+
+    document.getElementById('clearTx').onclick = ()=> {
+      txForm.reset();
+      populateAccountDropdowns(txMode, txFrom, txTo, txType.value);
+      updateAccountFieldsVisibility(txType.value, 'tx');
+    };
+
+    // Update subcategories when category changes
+    txCategory.addEventListener('change', updateSubCategoryDropdowns);
+    mobileTxCategory.addEventListener('change', updateMobileSubCategoryDropdowns);
+    
+    document.getElementById('editCategory').addEventListener('change', function() {
+      const selectedCategory = this.value;
+      const editSubCategory = document.getElementById('editSubCategory');
+      editSubCategory.innerHTML = '<option value="">Select Sub Category</option>';
+      editSubCategory.innerHTML += '<option value="">No Sub Category</option>';
+
+      if (selectedCategory) {
+        const category = data.categories.find(c => c.name === selectedCategory);
+        if (category && category.subcategories) {
+          // Sort subcategories alphabetically
+          const sortedSubcategories = [...category.subcategories].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubcategories.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = sub;
+            if (sub === tx.subCategory) opt.selected = true;
+            editSubCategory.appendChild(opt);
+          });
+        }
+      }
+    });
+
+    // Show/hide recurring options based on selection
+    recurringType.addEventListener('change', function() {
+      if (this.value === 'none') {
+        recurringOptions.classList.add('hidden');
+      } else {
+        recurringOptions.classList.remove('hidden');
+      }
+    });
+
+    mobileRecurringType.addEventListener('change', function() {
+      if (this.value === 'none') {
+        mobileRecurringOptions.classList.add('hidden');
+      } else {
+        mobileRecurringOptions.classList.remove('hidden');
+      }
+    });
+
+    // Show/hide account fields based on transaction type
+    txType.addEventListener('change', function() {
+      updateAccountFieldsVisibility(this.value, 'tx');
+      // Repopulate account dropdowns
+      populateAccountDropdowns(txMode, txFrom, txTo, this.value);
+      // Update category dropdown to show appropriate categories
+      updateCategoryDropdownForType(this.value);
+    });
+
+    mobileTxType.addEventListener('change', function() {
+      updateAccountFieldsVisibility(this.value, 'mobile');
+      // Repopulate account dropdowns
+      populateAccountDropdowns(mobileTxMode, mobileTxFrom, mobileTxTo, this.value);
+      // Update category dropdown to show appropriate categories
+      updateCategoryDropdownForType(this.value);
+    });
+
+    // Filter accounts based on payment mode
+    txMode.addEventListener('change', function() {
+      populateAccountDropdowns(txMode, txFrom, txTo, txType.value);
+    });
+
+    mobileTxMode.addEventListener('change', function() {
+      populateAccountDropdowns(mobileTxMode, mobileTxFrom, mobileTxTo, mobileTxType.value);
+    });
+
+    editMode.addEventListener('change', function() {
+      populateAccountDropdowns(editMode, editFrom, editTo, editType.value);
+    });
+
+    // Show/hide account fields in edit panel based on transaction type
+    editType.addEventListener('change', function() {
+      updateAccountFieldsVisibility(this.value, 'edit');
+      // Repopulate account dropdowns
+      populateAccountDropdowns(editMode, editFrom, editTo, this.value);
+      // Update category dropdown to show appropriate categories
+      updateCategoryDropdownForType(this.value);
+    });
+
+    // Update account fields visibility based on transaction type
+    function updateAccountFieldsVisibility(txTypeValue, formType) {
+      let fromField, toField;
+      
+      if (formType === 'tx') {
+        fromField = document.getElementById('fromAccountField');
+        toField = document.getElementById('toAccountField');
+      } else if (formType === 'mobile') {
+        fromField = document.getElementById('mobileFromAccountField');
+        toField = document.getElementById('mobileToAccountField');
+      } else if (formType === 'edit') {
+        fromField = document.getElementById('editFromAccountField');
+        toField = document.getElementById('editToAccountField');
+      }
+      
+      if (!fromField || !toField) return;
+      
+      // Hide both fields by default
+      fromField.style.display = 'none';
+      toField.style.display = 'none';
+      
+      // Show appropriate fields based on transaction type
+      if (txTypeValue === 'transfer') {
+        fromField.style.display = 'block';
+        toField.style.display = 'block';
+      } else if (txTypeValue === 'income') {
+        toField.style.display = 'block';
+      } else if (txTypeValue === 'expense') {
+        fromField.style.display = 'block';
+      }
+    }
+
+    // Update category dropdown based on transaction type
+    function updateCategoryDropdownForType(txTypeValue) {
+      const categorySelect = txType === document.activeElement ? txCategory : 
+                            mobileTxType === document.activeElement ? mobileTxCategory : 
+                            editType === document.activeElement ? document.getElementById('editCategory') : null;
+      
+      if (!categorySelect) return;
+      
+      // Clear current options
+      categorySelect.innerHTML = '<option value="">Select Category</option>';
+      categorySelect.innerHTML += '<option value="">No Category</option>';
+      
+      // Filter categories based on transaction type and sort alphabetically
+      const filteredCategories = data.categories
+        .filter(cat => cat.type === txTypeValue)
+        .sort((a, b) => a.name.localeCompare(b));
+      
+      // Add filtered categories to dropdown
+      filteredCategories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat.name;
+        opt.textContent = cat.name;
+        categorySelect.appendChild(opt);
+      });
+    }
+
+    // Sort order handlers
+    sortOldToNewBtn.addEventListener('click', function() {
+      sortOrder = 'oldToNew';
+      sortOldToNewBtn.classList.add('active');
+      sortNewToOldBtn.classList.remove('active');
+      renderTransactions();
+    });
+
+    sortNewToOldBtn.addEventListener('click', function() {
+      sortOrder = 'newToOld';
+      sortNewToOldBtn.classList.add('active');
+      sortOldToNewBtn.classList.remove('active');
+      renderTransactions();
+    });
+
+    /* ====== Edit Panel ====== */
+    function openEditPanel(tx, index){
+      editingTxIndex = index;
+      document.getElementById('editDate').value = tx.date;
+      document.getElementById('editDesc').value = tx.desc || '';
+      document.getElementById('editAmount').value = tx.amount;
+      document.getElementById('editMode').value = tx.mode;
+      document.getElementById('editType').value = tx.type;
+      document.getElementById('editCategory').value = tx.category || '';
+      document.getElementById('editSubCategory').value = tx.subCategory || '';
+      
+      // Set account values
+      document.getElementById('editFrom').value = tx.from || '';
+      document.getElementById('editTo').value = tx.to || '';
+      
+      // Update account fields visibility
+      updateAccountFieldsVisibility(tx.type, 'edit');
+      
+      // Repopulate account dropdowns based on mode
+      populateAccountDropdowns(editMode, editFrom, editTo, tx.type);
+      
+      // Update subcategory dropdown based on selected category
+      const editSubCategory = document.getElementById('editSubCategory');
+      editSubCategory.innerHTML = '<option value="">Select Sub Category</option>';
+      editSubCategory.innerHTML += '<option value="">No Sub Category</option>';
+
+      if (tx.category) {
+        const category = data.categories.find(c => c.name === tx.category);
+        if (category && category.subcategories) {
+          // Sort subcategories alphabetically
+          const sortedSubcategories = [...category.subcategories].sort((a, b) => a.localeCompare(b));
+          
+          sortedSubcategories.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = sub;
+            if (sub === tx.subCategory) opt.selected = true;
+            editSubCategory.appendChild(opt);
+          });
+        }
+      }
+      
+      // Find recurring transaction if exists
+      const recurring = data.recurringTransactions.find(rt => rt.id === tx.id);
+      if(recurring) {
+        document.getElementById('editRecurringType').value = recurring.type;
+        document.getElementById('editEndDate').value = recurring.endDate || '';
+        document.getElementById('editMaxOccurrences').value = recurring.maxOccurrences || '';
+        document.getElementById('editRecurringOptions').classList.remove('hidden');
+      } else {
+        document.getElementById('editRecurringType').value = 'none';
+        document.getElementById('editEndDate').value = '';
+        document.getElementById('editMaxOccurrences').value = '';
+        document.getElementById('editRecurringOptions').classList.add('hidden');
+      }
+      
+      document.getElementById('editPanelOverlay').classList.add('show');
+      setTimeout(()=> document.getElementById('editPanel').classList.add('show'), 30);
+    }
+    function closeEditPanel(){
+      document.getElementById('editPanel').classList.remove('show');
+      setTimeout(()=> document.getElementById('editPanelOverlay').classList.remove('show'), 300);
+      editingTxIndex = null;
+    }
+    document.getElementById('closeEditBtn').onclick = closeEditPanel;
+
+    // Show/hide edit recurring options based on selection
+    document.getElementById('editRecurringType').addEventListener('change', function() {
+      if (this.value === 'none') {
+        document.getElementById('editRecurringOptions').classList.add('hidden');
+      } else {
+        document.getElementById('editRecurringOptions').classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('editTxForm').addEventListener('submit', (e)=>{
+      e.preventDefault();
+      if(editingTxIndex === null){ closeEditPanel(); return; }
+      const tx = data.transactions[editingTxIndex];
+      tx.date = document.getElementById('editDate').value;
+      tx.desc = document.getElementById('editDesc').value;
+      tx.amount = Number(document.getElementById('editAmount').value) || 0;
+      tx.mode = document.getElementById('editMode').value;
+      tx.type = document.getElementById('editType').value;
+      tx.category = document.getElementById('editCategory').value || '';
+      tx.subCategory = document.getElementById('editSubCategory').value || '';
+      
+      // Update account fields based on transaction type
+      if (tx.type === 'income') {
+        tx.from = null;
+        tx.to = document.getElementById('editTo').value || null;
+      } else if (tx.type === 'expense') {
+        tx.from = document.getElementById('editFrom').value || null;
+        tx.to = null;
+      } else if (tx.type === 'transfer') {
+        tx.from = document.getElementById('editFrom').value || null;
+        tx.to = document.getElementById('editTo').value || null;
+        // Validate that from and to are not the same
+        if (tx.from === tx.to) {
+          alert('From and To accounts cannot be the same');
+          return;
+        }
+      }
+      
+      // Update recurring transaction if exists
+      const recurringIndex = data.recurringTransactions.findIndex(rt => rt.id === tx.id);
+      const recurringType = document.getElementById('editRecurringType').value;
+      
+      if(recurringType === 'none') {
+        // Remove recurring if set to none
+        if(recurringIndex !== -1) {
+          data.recurringTransactions.splice(recurringIndex, 1);
+        }
+      } else {
+        // Update or create recurring transaction
+        const recurringData = {
+          id: tx.id,
+          type: recurringType,
+          mode: tx.mode,
+          startDate: tx.date,
+          endDate: document.getElementById('editEndDate').value || null,
+          maxOccurrences: document.getElementById('editMaxOccurrences').value ? 
+            Number(document.getElementById('editMaxOccurrences').value) : null,
+          lastGenerated: tx.date,
+          occurrences: recurringIndex !== -1 ? data.recurringTransactions[recurringIndex].occurrences : 0,
+          stopped: recurringIndex !== -1 ? data.recurringTransactions[recurringIndex].stopped : false,
+          from: tx.from,
+          to: tx.to,
+          amount: tx.amount,
+          desc: tx.desc,
+          category: tx.category,
+          subCategory: tx.subCategory,
+          cashbackAmount: tx.cashbackAmount || 0
+        };
+        
+        if(recurringIndex !== -1) {
+          data.recurringTransactions[recurringIndex] = recurringData;
+        } else {
+          data.recurringTransactions.push(recurringData);
+        }
+      }
+      
+      saveData();
+      renderTransactions(); renderAccounts();
+      closeEditPanel();
+    });
+
+    document.getElementById('stopRecurringBtn').addEventListener('click', ()=>{
+      if(editingTxIndex === null) return;
+      const tx = data.transactions[editingTxIndex];
+      const recurringIndex = data.recurringTransactions.findIndex(rt => rt.id === tx.id);
+      
+      if(recurringIndex !== -1) {
+        data.recurringTransactions[recurringIndex].stopped = true;
+        saveData();
+        renderTransactions(); renderAccounts();
+        closeEditPanel();
+      }
+    });
+
+    document.getElementById('deleteTxBtn').addEventListener('click', ()=>{
+      if(editingTxIndex === null) return;
+      if(confirm('Are you sure you want to delete this transaction?')){
+        const tx = data.transactions[editingTxIndex];
+        
+        // Remove from transactions
+        data.transactions.splice(editingTxIndex, 1);
+        
+        // Remove from recurring transactions if exists
+        const recurringIndex = data.recurringTransactions.findIndex(rt => rt.id === tx.id);
+        if(recurringIndex !== -1) {
+          data.recurringTransactions.splice(recurringIndex, 1);
+        }
+        
+        saveData();
+        renderTransactions(); renderAccounts();
+        closeEditPanel();
+      }
+    });
+
+    /* ====== Mobile Add Panel ====== */
+    function openMobileAddPanel() {
+      document.getElementById('mobileAddPanel').classList.add('show');
+      // Set today's date as default
+      mobileTxDate.valueAsDate = new Date();
+      // Update account fields visibility
+      updateAccountFieldsVisibility(mobileTxType.value, 'mobile');
+    }
+    
+    function closeMobileAddPanel() {
+      document.getElementById('mobileAddPanel').classList.remove('show');
+    }
+    
+    document.getElementById('floatingAddBtn').addEventListener('click', openMobileAddPanel);
+    document.getElementById('closeMobileAddPanel').addEventListener('click', closeMobileAddPanel);
+
+    /* ====== Swipe Navigation for Mobile Tabs ====== */
+    let startX = 0;
+    let startY = 0;
+    let endX = 0;
+    let endY = 0;
+    let isSwiping = false;
+
+    // Add touch event listeners for swipe navigation
+    document.addEventListener('touchstart', handleTouchStart, false);
+    document.addEventListener('touchmove', handleTouchMove, false);
+    document.addEventListener('touchend', handleTouchEnd, false);
+
+    function handleTouchStart(e) {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      isSwiping = true;
+    }
+
+    function handleTouchMove(e) {
+      if (!isSwiping) return;
+      const touch = e.touches[0];
+      endX = touch.clientX;
+      endY = touch.clientY;
+    }
+
+    function handleTouchEnd(e) {
+      if (!isSwiping) return;
+      isSwiping = false;
+      
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      
+      // Only consider horizontal swipes
+      if (absDeltaX > absDeltaY && absDeltaX > 50) {
+        const tabs = Array.from(document.querySelectorAll('.mobile-tab'));
+        const activeTab = document.querySelector('.mobile-tab.active');
+        const currentIndex = tabs.indexOf(activeTab);
+        
+        if (deltaX > 0) {
+          // Swipe right - go to previous tab
+          if (currentIndex > 0) {
+            tabs[currentIndex - 1].click();
+          }
+        } else {
+          // Swipe left - go to next tab
+          if (currentIndex < tabs.length - 1) {
+            tabs[currentIndex + 1].click();
+          }
+        }
+      }
+    }
+
+    /* ====== Filters handlers ====== */
+    filterType.onchange = filterMode.onchange = filterAccount.onchange = filterCategory.onchange = filterSubCategory.onchange = filterSearch.oninput = ()=> { renderTransactions(); };
+    document.getElementById('resetFilters').onclick = ()=>{
+      filterType.value='all'; filterMode.value='all'; filterAccount.value='all'; filterCategory.value='all'; filterSubCategory.value='all'; filterSearch.value='';
+      highlightSummaryBox('summaryNetBox'); renderTransactions();
+    };
+
+    /* ====== Accounts UI ====== */
+    document.getElementById('addAccountBtn').onclick = ()=>{
+      const name = prompt('Enter a unique account name:');
+      if(name && name.trim() !== '') addAccount(name.trim());
+    };
+
+    /* ====== Categories UI ====== */
+    document.getElementById('addCategoryBtn').onclick = ()=>{
+      const name = prompt('Enter a unique category name:');
+      if(name && name.trim() !== '') {
+        const type = prompt('Enter category type (expense/income/transfer):', 'expense');
+        if (!['expense', 'income', 'transfer'].includes(type)) {
+          alert('Invalid category type. Using "expense" as default.');
+        }
+        const colors = ['#1e90ff', '#4169e1', '#6495ed', '#87cefa', '#4682b4', '#5f9ea0', '#708090', '#778899', '#696969', '#87ceeb', '#b0c4de', '#00bfff'];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        addCategory(name.trim(), randomColor, type);
+      }
+    };
+
+    /* ====== Export / Import / Reset ====== */
+    document.getElementById('exportJson').onclick = ()=>{
+      try {
+        const jsonData = JSON.stringify(data, null, 2);
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'daily-transactions.json';
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 100);
+      } catch (error) {
+        console.error('Export failed:', error);
+        alert('Failed to export data. Please try again.');
+      }
+    };
+    document.getElementById('importJsonBtn').onclick = ()=> importFile.click();
+    importFile.onchange = (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        try{
+          const parsed = JSON.parse(reader.result);
+          
+          // Validate data structure
+          if(parsed.accounts && parsed.transactions){
+            data = parsed;
+            saveData();
+            renderAccounts(); renderTransactions(); renderCategories();
+            alert('Data imported successfully!');
+          } else {
+            alert('Invalid file structure');
+          }
+        } catch(err){ alert('Invalid JSON file'); }
+      };
+      
+      reader.onerror = function() {
+        alert('Error reading file. Please try again.');
+        importFile.value = '';
+      };
+      
+      reader.readAsText(file);
+      importFile.value = '';
+    };
+    document.getElementById('resetAppBtn').onclick = ()=>{
+      if(confirm('Are you sure you want to reset all data? This action cannot be undone.')){
+       data = { 
+		accounts: [], 
+		transactions: [], 
+		initialBalances: {}, 
+		recurringTransactions: [],
+		categories: defaultCategories,
+		subAccounts: {},
+		subAccountBalances: {},
+		creditCardBillingCycles: {},
+		creditCardViewPref: {}
+	};
+        saveData(); renderAccounts(); renderTransactions(); renderCategories();
+      }
+    };
+
+    /* ====== Mobile Tabs ====== */
+    document.querySelectorAll('.mobile-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        const tabName = this.getAttribute('data-tab');
+        
+        // Update active tab
+        document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Hide all content first
+        document.querySelectorAll('.mobile-tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Show selected content with animation
+        setTimeout(() => {
+          document.querySelectorAll('.mobile-tab-content').forEach(content => {
+            if (content.getAttribute('data-tab') === tabName) {
+              content.classList.add('active');
+            }
+          });
+        }, 10);
+      });
+    });
+
+    /* ====== Category Tabs ====== */
+    document.querySelectorAll('.category-tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        const categoryType = this.getAttribute('data-category');
+        
+        // Update active tab
+        document.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Set active category tab
+        activeCategoryTab = categoryType;
+        
+        // Re-render categories
+        renderCategories();
+      });
+    });
+
+    /* ====== Expand/Collapse with animations ====== */
+    // Add click handlers for section titles to toggle content
+    document.querySelectorAll('.sectionTitle').forEach(title => {
+      title.addEventListener('click', function() {
+        const card = this.closest('.card');
+        const content = card.querySelector('.collapsible-content');
+        
+        if (content) {
+          content.classList.toggle('collapsed');
+        }
+      });
+    });
+
+    document.getElementById('expandAllBtn').onclick = function() {
+      document.querySelectorAll('.collapsible-content').forEach(content => {
+        content.classList.remove('collapsed');
+      });
+    };
+  
+
+    document.getElementById('collapseAllBtn').onclick = function() {
+      document.querySelectorAll('.collapsible-content').forEach(content => {
+        content.classList.add('collapsed');
+      });
+    };
+
+    /* ====== Initial load ====== */
+    loadData();
+
+    // If no accounts, add sample account
+    if(!data.accounts || data.accounts.length === 0){
+      data.accounts = ['Cash','Bank Account','Credit Card', 'Wallet'];
+      data.initialBalances = { 'Cash': 0, 'Bank Account': 0, 'Credit Card': 0, 'Wallet': 0 };
+      data.transactions = data.transactions || [];
+      data.recurringTransactions = data.recurringTransactions || [];
+      data.subAccounts = data.subAccounts || {};
+      data.subAccountBalances = data.subAccountBalances || {};
+      data.creditCardBillingCycles = data.creditCardBillingCycles || {};
+	  data.creditCardViewPref = data.creditCardViewPref || {};
+	  data.creditCardViewPref = data.creditCardViewPref || {};
+      saveData();
+    }
+
+    // ensure shape
+    data.transactions = (data.transactions||[]).map(t=>{
+      t.cashbackAmount = t.cashbackAmount || 0;
+      return t;
+    });
+
+    // Generate recurring transactions
+    addRecurringTransactions();
+
+    // kick things off
+    renderAccounts();
+    renderTransactions();
+    renderCategories();
+
+    // ensure summary highlight default
+    highlightSummaryBox('summaryNetBox');
+
+    // Set today's date as default
+    document.getElementById('txDate').valueAsDate = new Date();
+    
+    // Initialize account fields visibility
+    updateAccountFieldsVisibility(txType.value, 'tx');
+    
+    // Set today's date as default for mobile form
+    mobileTxDate.valueAsDate = new Date();
+    
+    // Initialize category dropdowns based on transaction type
+    updateCategoryDropdownForType(txType.value);
+  </script>
