@@ -1,4 +1,3 @@
-<script>
     /* ====== State & Storage ====== */
     const STORAGE_KEY = 'dailyTransactionsAppData_v5';
     let data = { 
@@ -2144,4 +2143,3 @@ if (isHidden) {
     
     // Initialize category dropdowns based on transaction type
     updateCategoryDropdownForType(txType.value);
-  </script>
